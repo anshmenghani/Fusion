@@ -1,0 +1,5 @@
+venv/
+src/data/formattedData/
+src/data/unformattedData/
+src/FUSION/FusionStellaarData.csv
+.DS_Store

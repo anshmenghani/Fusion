@@ -1,0 +1,272 @@
+#ॐ
+
+'''Fusion...
+ 
+'''
+
+import os
+os.environ["KERAS_BACKEND"] = "tensorflow" # Set the Keras backend environmental variable to Tensorflow
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0" # Turn off the Tesorflow OneDNN option 
+
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import RobustScaler
+from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
+from tensorflow.keras.layers import Layer, Input, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, Lambda, PReLU, Softmax, Cropping1D, Reshape
+from tensorflow.keras import backend as K
+from tensorflow.keras.models import Model
+from tensorflow.keras.constraints import Constraint
+from tensorflow.keras.losses import MeanSquaredLogarithmicError as MSLE, CategoricalCrossentropy as CCE
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.activations import gelu
+from tensorflow.keras.utils import to_categorical
+from tensorflow import TensorShape, constant, cast, clip_by_value, convert_to_tensor, Variable, float32
+import tensorflow.keras.callbacks as callbacks
+from tensorflow.experimental.numpy import log10
+
+
+# Set initial global variables
+gen_inputs = None
+submodelCount = 0
+prev_val_loss = Variable(0, dtype=float32)
+curr_val_loss = Variable(0, dtype=float32)
+
+
+# Prepare training and testing data from dataframe
+def data_prep(df, inputs, outputs, mod_attrs, mod_funcs):
+   df = shuffle(df)   
+   for idx, m in enumerate(mod_attrs):
+       modded = df[m].apply(mod_funcs[idx])
+       df[m] = modded
+
+   x = df[inputs].iloc[:, :]
+   y = df[outputs].iloc[:, :]
+   x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.08)
+   
+   t_list = list(set(outputs) - set(mod_attrs))
+   robust_scaler = RobustScaler().set_output(transform="pandas")
+   y_train = robust_scaler.fit_transform(y_train[t_list])
+   for v in mod_attrs:
+       y_train.insert(outputs.index(v), v, df[v])
+   y_train.columns = outputs
+
+   return x_train, x_test, y_train, y_test
+
+
+# Updates the validation loss records in the model's callback history
+class UpdateHistory(callbacks.Callback):
+    def __init__(self):
+        super(UpdateHistory, self).__init__()
+
+    def on_epoch_end(self, epoch, logs=None):
+        global prev_val_loss
+        global curr_val_loss
+        try:
+            prev_val_loss.assign(curr_val_loss) 
+            curr_val_loss.assign(logs["val_loss"])
+        except KeyError:
+            pass
+
+
+# Constrains the validation loss reward ratio weight to a reasonable size
+class ValLossRewardConstraint(Constraint):
+    def __call__(self, weights):
+        return clip_by_value(weights, 0.001, 10)
+
+
+# Trains a weight to reward the model for improvments in validation loss
+class LossRewardOptimizer(Layer):
+    def __init__(self, name, **kwargs):
+        super(LossRewardOptimizer, self).__init__(**kwargs)
+        self.name = name
+
+    def build(self, input_shape):
+        def reward_initializer(shape, dtype=None):
+            reward_init = np.mean(np.clip(np.random.normal(0.55, 0.2, 32), 0.1, 1))
+            return constant(reward_init, shape=(1,), dtype=float32)
+        
+        self.lro_alpha = self.add_weight(name="lro_alpha", shape=(1,), initializer=reward_initializer, trainable=True, constraint=ValLossRewardConstraint())
+
+        super(LossRewardOptimizer, self).build(input_shape)
+    
+    def call(self, inputs):
+        return inputs
+
+    def compute_output_shape(self, input_shape):
+        return TensorShape(input_shape)
+
+    def get_config(self):
+        config = super(LossRewardOptimizer, self).get_config()
+        config.update({"name": self.name,})
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(name=config["name"])
+
+
+# Square Root Mean Squared Logarithmic Error
+def RMSLE(y_true, y_pred):
+   mean_squared_logarithmic_error = MSLE()
+   return K.sqrt(mean_squared_logarithmic_error(y_true, y_pred))
+
+
+# Custom loss function to factor in validation loss reward 
+def DLR(init_loss_func, model, count):
+    def calc_rloss(y_true, y_pred):
+        global prev_val_loss
+        global curr_val_loss
+        val_loss_rewardRatio = model.get_layer("lroLayer{}".format(str(count))).lro_alpha
+        init_loss = init_loss_func(y_true, y_pred)
+        loss_reward = cast(val_loss_rewardRatio, float32) * (cast(prev_val_loss, float32) - cast(curr_val_loss, float32))
+        final_loss = cast(init_loss, float32) - cast(loss_reward, float32)
+        return convert_to_tensor(final_loss, dtype=float32)
+    return calc_rloss
+
+
+# Slice lambda layers for desired inputs 
+def lambda_init(in_layer, indices):
+   in_shape = in_layer.shape[1]
+   inter1 = Reshape((in_shape, 1))(in_layer)
+   
+   raw_lambda_list = []
+   for i in indices:
+       inter2 = Cropping1D(cropping=(i, in_shape - i - 1))(inter1)
+       raw_lambda_list.append(inter2)
+   reshaped_lambda_list = []
+   for r in raw_lambda_list:
+       inter3 = Reshape((1,))(r)
+       reshaped_lambda_list.append(inter3)
+   
+   if len(reshaped_lambda_list) > 1:
+       return reshaped_lambda_list
+   return reshaped_lambda_list[0]
+
+
+# Define the lambda layers of the model
+def lambda_functors():
+   mbol_lam = Lambda(lambda lum: log10(lum))
+   lbol_lam = Lambda(lambda rad_surftemp: log10(rad_surftemp[0]**2 * rad_surftemp[1]**4)) 
+   mass_lam = Lambda(lambda lum: lum ** (2/7))
+   density_lam = Lambda(lambda mass_vol: mass_vol[0] / mass_vol[1])
+   central_pressure_lam = Lambda(lambda mass_rad: log10(mass_rad[0]**2 / mass_rad[1]**4))
+   central_temp_lam = Lambda(lambda mass_rad: mass_rad[0] / mass_rad[1])
+   lifespan_lam = Lambda(lambda mass_lum: mass_lum[0] / mass_lum[1])
+   grav_bind_lam = Lambda(lambda mass_rad: log10(mass_rad[0]**2 / mass_rad[1]))
+   flux_lam = Lambda(lambda surftemp: log10(surftemp ** 4))
+   peak_wavelength_lam = Lambda(lambda surftemp: 1 / surftemp)
+
+   return mbol_lam, lbol_lam, mass_lam, density_lam, central_pressure_lam, central_temp_lam, lifespan_lam, grav_bind_lam, flux_lam, peak_wavelength_lam
+
+
+# Create each output's individual submodel
+def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True, output_neurons=1, output_actv=None):
+   global gen_inputs
+   global submodelCount
+
+   if shape:
+       input_layer = Input(shape=(shape,), name="input_layer{}".format(submodelCount))
+       gen_inputs = input_layer
+   else:
+       input_layer = gen_inputs
+   if norm is True:
+       norm_input = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(input_layer)
+   else:
+       norm_input = Discretization(bin_boundaries=norm, output_mode="int", name="disc{}".format(submodelCount))(input_layer)
+       norm_input = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(norm_input)
+
+   hidden_input = Dense(32, activation=gelu, kernel_regularizer="L1L2", bias_regularizer="L1L2", activity_regularizer="L1L2", name="hidden_input{}".format(submodelCount))(norm_input)
+   hidden_input = PReLU()(hidden_input)
+   hidden_input = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(hidden_input)
+   hidden_input = GaussianDropout(0.5)(hidden_input)
+
+   if lambda_layer:
+       selective_lambda_inputs_layer = lambda_init(input_layer, lambda_inputs)
+       selective_special_lambda_layer = lambda_layer(selective_lambda_inputs_layer)
+       selective_hidden_special = Dense(32, activation=gelu, kernel_regularizer="L1L2", bias_regularizer="L1L2", activity_regularizer="L1L2", name="selective_hidden_special{}".format(submodelCount))(selective_special_lambda_layer)
+       selective_hidden_special = PReLU()(selective_hidden_special)
+       selective_hidden_special = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(selective_hidden_special)
+       selective_hidden_special = GaussianDropout(0.5)(selective_hidden_special)
+
+       combine = concatenate([hidden_input, selective_hidden_special], name="combine{}".format(submodelCount))
+       combine = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(combine)
+   else:
+       combine = hidden_input
+
+   hidden1 = Dense(64, activation=gelu, kernel_regularizer="L1L2", bias_regularizer="L1L2", activity_regularizer="L1L2", name="hidden1_{}".format(submodelCount))(combine)
+   hidden1 = PReLU()(hidden1)
+   hidden1 = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(hidden1)
+   hidden1 = GaussianDropout(0.5)(hidden1)
+   hidden2 = Dense(64, activation=gelu, kernel_regularizer="L1L2", bias_regularizer="L1L2", activity_regularizer="L1L2", name="hidden2_{}".format(submodelCount))(hidden1)
+   hidden2 = PReLU()(hidden2)
+   hidden2 = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(hidden2)
+   hidden2 = GaussianDropout(0.5)(hidden2)
+   hidden3 = Dense(64, activation=gelu, kernel_regularizer="L1L2", bias_regularizer="L1L2", activity_regularizer="L1L2", name="hidden3_{}".format(submodelCount))(hidden2)
+   hidden3 = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(hidden3)
+   hidden3 = PReLU()(hidden3)
+
+   output = Dense(output_neurons, name="output_layer{}".format(submodelCount))(hidden3)
+   if output_actv is not None:
+       output = output_actv(output)
+       output.name += str(submodelCount)
+
+   lro_layer = LossRewardOptimizer(name="lroLayer{}".format(submodelCount))(output)
+   gen_inputs = concatenate([gen_inputs, lro_layer], name="upd_inputs_with_new_output{}".format(submodelCount))
+   submodelCount += 1
+
+   return [input_layer, lro_layer]
+
+
+# Consolidate all submodels with submodel-specific parameters
+def createModels():
+   mbol_lam, lbol_lam, mass_lam, density_lam, central_pressure_lam, central_temp_lam, lifespan_lam, grav_bind_lam, flux_lam, peak_wavelength_lam = lambda_functors()
+
+   mbol_submodel = createSubModel(shape=8, lambda_layer=mbol_lam, lambda_inputs=[1])
+   absmag_submodel = createSubModel()
+   lbol_submodel = createSubModel(lambda_layer=lbol_lam, lambda_inputs=[2, 0])
+   mass_submodel = createSubModel(lambda_layer=mass_lam, lambda_inputs=[1])
+   density_submodel = createSubModel(lambda_layer=density_lam, lambda_inputs=[11, 4])
+   central_pressure_submodel = createSubModel(lambda_layer=central_pressure_lam, lambda_inputs=[11, 2])
+   central_temp_submodel = createSubModel(lambda_layer=central_temp_lam, lambda_inputs=[11, 2])
+   lifespan_submodel = createSubModel(lambda_layer=lifespan_lam, lambda_inputs=[11, 1])
+   surf_grav_submodel = createSubModel()
+   grav_bind_submodel = createSubModel(lambda_layer=grav_bind_lam, lambda_inputs=[11, 2])
+   flux_submodel = createSubModel(lambda_layer=flux_lam, lambda_inputs=[0])
+   metallicity_submodel = createSubModel()
+   spectral_class_submodel = createSubModel(norm=[0., 4000., 5200., 7000., 12000., 20000., 34000., 420000.], output_neurons=7, output_actv=Softmax())
+   lum_class_submodel = createSubModel(norm=[0., 25., 100., 1300., 8000., 125000.], output_neurons=7, output_actv=Softmax())
+   peak_wavelength_submodel = createSubModel(lambda_layer=peak_wavelength_lam, lambda_inputs=[0])
+   star_type_submodel = createSubModel(output_neurons=6, output_actv=Softmax())
+
+   return [mbol_submodel, absmag_submodel, lbol_submodel, mass_submodel, density_submodel, central_pressure_submodel, central_temp_submodel, lifespan_submodel, surf_grav_submodel, grav_bind_submodel, flux_submodel, metallicity_submodel, spectral_class_submodel, lum_class_submodel, peak_wavelength_submodel, star_type_submodel]
+
+
+# Compile the final model 
+def fuseModels(models, name):
+   fusion_inputs = models[0][0]
+   fusion_outputs = [y[1] for y in models]
+   fusion = Model(inputs=fusion_inputs, outputs=fusion_outputs, name=name)
+   loss_list = [DLR(MSLE(), fusion, 0), DLR(MSLE(), fusion, 1), DLR(RMSLE, fusion, 2), DLR(RMSLE, fusion, 3), DLR(MSLE(), fusion, 4), DLR(RMSLE, fusion, 5), DLR(RMSLE, fusion, 6), DLR(MSLE(), fusion, 7), DLR(RMSLE, fusion, 8), DLR(RMSLE, fusion, 9), DLR(RMSLE, fusion, 10), DLR(RMSLE, fusion, 11), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 12), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 13), DLR(RMSLE, fusion, 14), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 15)]
+   fusion.compile(optimizer=Adam(learning_rate=0.001), loss=loss_list, metrics=loss_list, run_eagerly=False, jit_compile=False, steps_per_execution=1)
+   return fusion
+
+
+# Train the model and return the trained model and testing data 
+def Fuse():
+   dataset = pd.read_csv(r"src/FUSION/FusionStellaarData.csv")
+   prep_func6 = lambda inpVec: to_categorical(inpVec, num_classes=6)
+   prep_func7 = lambda inpVec: to_categorical(inpVec, num_classes=7)
+   # change e=mc2 to metallicty here
+   x_train, x_test, y_train, y_test = data_prep(dataset, ["Effective&SurfaceTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"], ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "PotentialEnergy(log(J))", "SpectralClass", "LuminosityClass", "StarPeakWavelength(nm)", "StarType"], ["SpectralClass", "LuminosityClass", "StarType"], [prep_func7, prep_func7, prep_func6])
+   y_train, y_test = [np.stack(y_train[l]) for l in list(y_train)], [np.stack(y_test[l]) for l in list(y_test)]
+
+   Fusion = fuseModels(createModels(), name="Fusion")
+   earlyStoppingCallback = callbacks.EarlyStopping(monitor="loss", min_delta=0.13, patience=128, baseline=None, mode="min", verbose=2, restore_best_weights=True, start_from_epoch=1024)
+   Fusion.fit(x=x_train, y=y_train, validation_split=24/x_train.shape[0], epochs=16384, batch_size=64, shuffle=True, verbose=1, steps_per_epoch=3, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=24, validation_freq=1, validation_steps=1)
+   
+   return Fusion, (x_test, y_test)
+
+
+if __name__ == "__main__":
+   Fuse()
