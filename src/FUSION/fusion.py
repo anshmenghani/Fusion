@@ -339,16 +339,20 @@ def fuseModels(models, name):
 
 # Train the model and return the trained model and testing data 
 def Fuse():
-   dataset = pd.read_csv(r"src/FUSION/FusionStellaarData.csv", nrows=100)
+   dataset = pd.read_csv(r"src/FUSION/FusionStellaarData.csv")
    prep_func6 = lambda inpVec: to_categorical(inpVec, num_classes=6)
    prep_func7 = lambda inpVec: to_categorical(inpVec, num_classes=7)
-   x_train, x_test, y_train, y_test = data_prep(dataset, ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"], ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "SpectralClass", "LuminosityClass", "StarPeakWavelength(nm)", "StarType"], ["SpectralClass", "LuminosityClass", "StarType"], [prep_func7, prep_func7, prep_func6])
-   y_train, y_test = [np.stack(y_train[l]) for l in list(y_train)], [np.stack(y_test[l]) for l in list(y_test)]
+   x_cols = ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"]
+   y_cols = ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "SpectralClass", "LuminosityClass", "StarPeakWavelength(nm)", "StarType"]
+   x_train, x_test, y_train, y_test = data_prep(dataset, x_cols, y_cols, ["SpectralClass", "LuminosityClass", "StarType"], [prep_func7, prep_func7, prep_func6])
+   y_train = [np.stack(y_train[l]) for l in list(y_train)]
 
    Fusion = fuseModels(createModels(), name="Fusion")
    earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=2, baseline=None, mode="min", verbose=2, restore_best_weights=True)
-   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=11, batch_size=64, steps_per_epoch=1, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=1)
-   Fusion.save("fusionModel1.keras")
+   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=11, batch_size=64, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=1)
+   Fusion.save("src/FUSION/fusionModel.keras")
+   pd.DataFrame(x_test, columns=x_cols).to_csv("src/FUSION/testData/x_test.csv")
+   pd.DataFrame(y_test, columns=y_cols).to_csv("src/FUSION/testData/y_test.csv")
 
    return Fusion, (x_test, y_test)
 
