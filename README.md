@@ -36,7 +36,7 @@ The target stars:
 - Bolometric Correction (based on the predicted bolometric and absolute magnitude values) 
 - Stellar Classification (based on the predicted Spectral and Luminosity classes)
 
-The model uses a TensorFlow/Keras backend with custom functions tailored to the specific regression and classification problems described above as well as overall model improvement. The model is tested to have a [_] percent average accuracy per round of predictions and a [_] average speed per round of predictions.
+The model uses a TensorFlow/Keras backend with custom functions tailored to the specific regression and classification problems described above as well as overall model improvement. 
 
 ## Usage
 #### Once the paper is finished I will start working on deployment and usage instructions for the general public 
