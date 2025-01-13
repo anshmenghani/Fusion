@@ -156,7 +156,7 @@ def lambda_functors():
    mass_lam = Lambda(lambda lum: lum ** (2/7))
    density_lam = Lambda(lambda mass_vol: mass_vol[0] / mass_vol[1])
    central_pressure_lam = Lambda(lambda mass_rad: log10(mass_rad[0]**2 / mass_rad[1]**4))
-   central_temp_lam = Lambda(lambda mass_rad: log10(mass_rad[0] / mass_rad[1]))
+   central_temp_lam = Lambda(lambda mass_rad: mass_rad[0] / mass_rad[1])
    lifespan_lam = Lambda(lambda mass_lum: mass_lum[0] / mass_lum[1])
    grav_bind_lam = Lambda(lambda mass_rad: log10(mass_rad[0]**2 / mass_rad[1]))
    flux_lam = Lambda(lambda surftemp: log10(surftemp ** 4))
@@ -253,7 +253,7 @@ def fuseModels(models, name):
    fusion_outputs = [y[1] for y in models]
    fusion = Model(inputs=fusion_inputs, outputs=fusion_outputs, name=name)
    loss_list = [DLR(MSLE(), fusion, 0), DLR(MSLE(), fusion, 1), DLR(RMSLE, fusion, 2), DLR(RMSLE, fusion, 3), DLR(MSLE(), fusion, 4), DLR(RMSLE, fusion, 5), DLR(RMSLE, fusion, 6), DLR(MSLE(), fusion, 7), DLR(RMSLE, fusion, 8), DLR(RMSLE, fusion, 9), DLR(RMSLE, fusion, 10), DLR(RMSLE, fusion, 11), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 12), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 13), DLR(RMSLE, fusion, 14), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 15)]
-   fusion.compile(optimizer=Adam(learning_rate=0.001), loss=loss_list, metrics=loss_list, run_eagerly=False, jit_compile=True, steps_per_execution=1, auto_scale_loss=True)
+   fusion.compile(optimizer=Adam(learning_rate=0.001), loss=loss_list, metrics=loss_list, run_eagerly=False, steps_per_execution=1, auto_scale_loss=True)
    return fusion
 
 
@@ -266,9 +266,10 @@ def Fuse():
    y_train, y_test = [np.stack(y_train[l]) for l in list(y_train)], [np.stack(y_test[l]) for l in list(y_test)]
 
    Fusion = fuseModels(createModels(), name="Fusion")
-   earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=128, baseline=None, mode="min", verbose=2, restore_best_weights=True, start_from_epoch=1024)
-   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=16384, batch_size=64, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=4)
-   
+   earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=1, baseline=None, mode="min", verbose=2, restore_best_weights=True)
+   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=11, batch_size=64, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=1)
+   Fusion.save("fusionModel.keras")
+
    return Fusion, (x_test, y_test)
 
 
