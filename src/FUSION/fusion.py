@@ -42,7 +42,7 @@ def data_prep(df, inputs, outputs, mod_attrs, mod_funcs):
 
    x = df[inputs].iloc[:, :]
    y = df[outputs].iloc[:, :]
-   x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.08)
+   x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.05)
    
    t_list = list(set(outputs) - set(mod_attrs))
    robust_scaler = RobustScaler().set_output(transform="pandas")
@@ -151,7 +151,7 @@ def lambda_functors():
    mass_lam = Lambda(lambda lum: lum ** (2/7))
    density_lam = Lambda(lambda mass_vol: mass_vol[0] / mass_vol[1])
    central_pressure_lam = Lambda(lambda mass_rad: log10(mass_rad[0]**2 / mass_rad[1]**4))
-   central_temp_lam = Lambda(lambda mass_rad: mass_rad[0] / mass_rad[1])
+   central_temp_lam = Lambda(lambda mass_rad: log10(mass_rad[0] / mass_rad[1]))
    lifespan_lam = Lambda(lambda mass_lum: mass_lum[0] / mass_lum[1])
    grav_bind_lam = Lambda(lambda mass_rad: log10(mass_rad[0]**2 / mass_rad[1]))
    flux_lam = Lambda(lambda surftemp: log10(surftemp ** 4))
@@ -257,13 +257,12 @@ def Fuse():
    dataset = pd.read_csv(r"src/FUSION/FusionStellaarData.csv")
    prep_func6 = lambda inpVec: to_categorical(inpVec, num_classes=6)
    prep_func7 = lambda inpVec: to_categorical(inpVec, num_classes=7)
-   # change e=mc2 to metallicty here
-   x_train, x_test, y_train, y_test = data_prep(dataset, ["Effective&SurfaceTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"], ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "PotentialEnergy(log(J))", "SpectralClass", "LuminosityClass", "StarPeakWavelength(nm)", "StarType"], ["SpectralClass", "LuminosityClass", "StarType"], [prep_func7, prep_func7, prep_func6])
+   x_train, x_test, y_train, y_test = data_prep(dataset, ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"], ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "SpectralClass", "LuminosityClass", "StarPeakWavelength(nm)", "StarType"], ["SpectralClass", "LuminosityClass", "StarType"], [prep_func7, prep_func7, prep_func6])
    y_train, y_test = [np.stack(y_train[l]) for l in list(y_train)], [np.stack(y_test[l]) for l in list(y_test)]
 
    Fusion = fuseModels(createModels(), name="Fusion")
-   earlyStoppingCallback = callbacks.EarlyStopping(monitor="loss", min_delta=0.13, patience=128, baseline=None, mode="min", verbose=2, restore_best_weights=True, start_from_epoch=1024)
-   Fusion.fit(x=x_train, y=y_train, validation_split=24/x_train.shape[0], epochs=16384, batch_size=64, shuffle=True, verbose=1, steps_per_epoch=3, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=24, validation_freq=1, validation_steps=1)
+   earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=128, baseline=None, mode="min", verbose=2, restore_best_weights=True, start_from_epoch=1024)
+   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=16384, batch_size=64, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=4)
    
    return Fusion, (x_test, y_test)
 
