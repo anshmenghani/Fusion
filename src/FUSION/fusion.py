@@ -21,11 +21,12 @@ import pandas as pd
 from sklearn.preprocessing import RobustScaler
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
-from tensorflow.keras.layers import Layer, Input, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, Lambda, PReLU, Softmax, Cropping1D, Reshape
+from tensorflow.keras.layers import Layer, Input, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, PReLU, Softmax, Cropping1D, Reshape
 from tensorflow.keras import backend as K
+from tensorflow.keras.saving import register_keras_serializable
 from tensorflow.keras.models import Model
 from tensorflow.keras.constraints import Constraint
-from tensorflow.keras.losses import MeanSquaredLogarithmicError as MSLE, CategoricalCrossentropy as CCE
+from tensorflow.keras.losses import MeanSquaredLogarithmicError as MSLE, CategoricalCrossentropy as CCE, Loss
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.activations import gelu
 from tensorflow.keras.utils import to_categorical
@@ -77,6 +78,57 @@ class UpdateHistory(callbacks.Callback):
             pass
 
 
+# Allow the compatibility of lambda layers with saving the model
+@register_keras_serializable()
+class LambdaLayerClass(Layer):
+    def __init__(self, func, name, **kwargs):
+        super(LambdaLayerClass, self).__init__(**kwargs)
+        self.name = name
+        self.func = func
+
+    def build(self, input_shape):
+        super(LambdaLayerClass, self).build(input_shape)
+
+    def call(self, inputs):
+        if self.func == "mbol":
+            return log10(inputs)
+        elif self.func == "lbol":
+            return log10(inputs[0]**2 * inputs[1]**4)
+        elif self.func == "mass":
+            return inputs ** (2/7)
+        elif self.func == "density":
+            return inputs[0] / inputs[1]
+        elif self.func == "cpres":
+            return log10(inputs[0]**2 / inputs[1]**4)
+        elif self.func == "ctemp":
+            return inputs[0] / inputs[1]
+        elif self.func == "lifespan":
+            return inputs[0] / inputs[1]
+        elif self.func == "grav_bind":
+            return log10(inputs[0]**2 / inputs[1])
+        elif self.func == "fbol":
+            return log10(inputs ** 4)
+        elif self.func == "peak_wl":
+            return 1 / inputs
+    
+    def compute_output_shape(self, input_shape):
+        return TensorShape([None, 1])
+    
+    def get_config(self):
+        config = super(LambdaLayerClass, self).get_config()
+        config.update({
+            "name": self.name, 
+            "func": self.func
+            })
+        return config    
+    
+    @classmethod
+    def from_config(cls, config):
+        name = config["name"]
+        func = config["func"]
+        return cls(name=name, func=func)
+
+
 # Constrains the validation loss reward ratio weight to a reasonable size
 class ValLossRewardConstraint(Constraint):
     def __call__(self, weights):
@@ -84,6 +136,7 @@ class ValLossRewardConstraint(Constraint):
 
 
 # Trains a weight to reward the model for improvments in validation loss
+@register_keras_serializable()
 class LossRewardOptimizer(Layer):
     def __init__(self, name, **kwargs):
         super(LossRewardOptimizer, self).__init__(**kwargs)
@@ -106,7 +159,9 @@ class LossRewardOptimizer(Layer):
 
     def get_config(self):
         config = super(LossRewardOptimizer, self).get_config()
-        config.update({"name": self.name,})
+        config.update({
+            "name": self.name,
+            })
         return config
 
     @classmethod
@@ -120,17 +175,39 @@ def RMSLE(y_true, y_pred):
    return K.sqrt(mean_squared_logarithmic_error(y_true, y_pred))
 
 
-# Custom loss function to factor in validation loss reward 
-def DLR(init_loss_func, model, count):
-    def calc_rloss(y_true, y_pred):
+# Custom loss to factor in validation loss reward 
+@register_keras_serializable()
+class DLR(Loss):
+    def __init__(self, init_loss_func, model, count, **kwargs):
+        super(DLR, self).__init__(**kwargs)
+        self.init_loss_func = init_loss_func
+        self.model = model
+        self.count = count
+
+    def call(self, y_true, y_pred):
         global prev_val_loss
         global curr_val_loss
-        val_loss_rewardRatio = model.get_layer("lroLayer{}".format(str(count))).lro_alpha
-        init_loss = init_loss_func(y_true, y_pred)
+        val_loss_rewardRatio = self.model.get_layer("lroLayer{}".format(str(self.count))).lro_alpha
+        init_loss = self.init_loss_func(y_true, y_pred)
         loss_reward = cast(val_loss_rewardRatio, float32) * (cast(prev_val_loss, float32) - cast(curr_val_loss, float32))
         final_loss = cast(init_loss, float32) - cast(loss_reward, float32)
         return convert_to_tensor(final_loss, dtype=float32)
-    return calc_rloss
+    
+    def get_config(self):
+        config = super(DLR, self).get_config()
+        config.update({
+            "init_loss_func": self.init_loss_func,
+            "model": None,
+            "count": self.count
+        })
+        return config
+    
+    @classmethod
+    def from_config(cls, config):
+        init_loss_func = config["init_loss_func"]
+        model = config["model"]
+        count = config["count"]
+        return cls(init_loss_func=init_loss_func, model=model, count=count)
 
 
 # Slice lambda layers for desired inputs 
@@ -154,16 +231,16 @@ def lambda_init(in_layer, indices):
 
 # Define the lambda layers of the model
 def lambda_functors():
-   mbol_lam = Lambda(lambda lum: log10(lum))
-   lbol_lam = Lambda(lambda rad_surftemp: log10(rad_surftemp[0]**2 * rad_surftemp[1]**4)) 
-   mass_lam = Lambda(lambda lum: lum ** (2/7))
-   density_lam = Lambda(lambda mass_vol: mass_vol[0] / mass_vol[1])
-   central_pressure_lam = Lambda(lambda mass_rad: log10(mass_rad[0]**2 / mass_rad[1]**4))
-   central_temp_lam = Lambda(lambda mass_rad: mass_rad[0] / mass_rad[1])
-   lifespan_lam = Lambda(lambda mass_lum: mass_lum[0] / mass_lum[1])
-   grav_bind_lam = Lambda(lambda mass_rad: log10(mass_rad[0]**2 / mass_rad[1]))
-   flux_lam = Lambda(lambda surftemp: log10(surftemp ** 4))
-   peak_wavelength_lam = Lambda(lambda surftemp: 1 / surftemp)
+   mbol_lam = LambdaLayerClass(name="llcLayer0", func="mbol")
+   lbol_lam = LambdaLayerClass(name="llcLayer1", func="lbol") 
+   mass_lam = LambdaLayerClass(name="llcLayer2", func="mass")
+   density_lam = LambdaLayerClass(name="llcLayer3", func="density")
+   central_pressure_lam = LambdaLayerClass(name="llcLayer4", func="cpres")
+   central_temp_lam = LambdaLayerClass(name="llcLayer5", func="ctemp")
+   lifespan_lam = LambdaLayerClass(name="llcLayer6", func="lifespan")
+   grav_bind_lam = LambdaLayerClass(name="llcLayer7", func="grav_bind")
+   flux_lam = LambdaLayerClass(name="llcLayer8", func="fbol")
+   peak_wavelength_lam = LambdaLayerClass(name="llcLayer9", func="peak_wl")
 
    return mbol_lam, lbol_lam, mass_lam, density_lam, central_pressure_lam, central_temp_lam, lifespan_lam, grav_bind_lam, flux_lam, peak_wavelength_lam
 
@@ -262,16 +339,16 @@ def fuseModels(models, name):
 
 # Train the model and return the trained model and testing data 
 def Fuse():
-   dataset = pd.read_csv(r"src/FUSION/FusionStellaarData.csv")
+   dataset = pd.read_csv(r"src/FUSION/FusionStellaarData.csv", nrows=100)
    prep_func6 = lambda inpVec: to_categorical(inpVec, num_classes=6)
    prep_func7 = lambda inpVec: to_categorical(inpVec, num_classes=7)
    x_train, x_test, y_train, y_test = data_prep(dataset, ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"], ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "SpectralClass", "LuminosityClass", "StarPeakWavelength(nm)", "StarType"], ["SpectralClass", "LuminosityClass", "StarType"], [prep_func7, prep_func7, prep_func6])
    y_train, y_test = [np.stack(y_train[l]) for l in list(y_train)], [np.stack(y_test[l]) for l in list(y_test)]
 
    Fusion = fuseModels(createModels(), name="Fusion")
-   earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=1, baseline=None, mode="min", verbose=2, restore_best_weights=True)
-   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=11, batch_size=64, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=1)
-   Fusion.save("fusionModel.keras")
+   earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=2, baseline=None, mode="min", verbose=2, restore_best_weights=True)
+   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=11, batch_size=64, steps_per_epoch=1, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=1)
+   Fusion.save("fusionModel1.keras")
 
    return Fusion, (x_test, y_test)
 
