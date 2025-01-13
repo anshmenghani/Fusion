@@ -1,5 +1,5 @@
 # Fusion
-The Fusion Stellaar Model is designed to predict and classify
+The Fusion Stellar Model is designed to predict and classify
 stellar parameters with higher accuracy than traditional formulas. 
 It takes inputs of a star's Effective Temperature, Luminosity, and 
 Radius, and runs its Deep Neural Network algorithm to predict and 
@@ -10,7 +10,7 @@ million features.
 ## The Project
 The Fusion model is a deep neural network that can tackle regression and classification problems, depending on the parameter of a star it is predicting. Here are the required inputs and output parameters the model is compatible with: 
 ### Inputs (at least two of the following)
-The target star's: 
+The target stars: 
 - Effective Temperature (in Kelvin)
 - Radius (in solar radii)
 - Luminosity (in solar luminosity)
@@ -45,4 +45,4 @@ The target star's:
 The model uses a TensorFlow/Keras backend with custom functions tailored to the specific regression and classification problems described above as well as overall model improvement. The model is tested to have a [_] percent average accuracy per round of predictions and a [_] average speed per round of predictions.
 
 ## Usage
-#### Once paper is finished I will start working on deployment and usage instructions for the general public 
+#### Once the paper is finished I will start working on deployment and usage instructions for the general public 
