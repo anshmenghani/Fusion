@@ -1,7 +1,12 @@
 #ॐ
 
-'''Fusion...
- 
+'''The Fusion Stellaar Model is designed to predict and classify
+stellar attributes with higher accuracy than traditional formulas. 
+It takes inputs of a star's Effective Temperature, Luminosity, and 
+Radius and runs it's Deep Neural Network algorithm to predict and 
+classify other attributes of a star such as Mass, Surface Gravity, 
+etc. It is trained on ESA's Gaia mission dataset with over 403 
+million features.  
 '''
 
 import os
@@ -248,7 +253,7 @@ def fuseModels(models, name):
    fusion_outputs = [y[1] for y in models]
    fusion = Model(inputs=fusion_inputs, outputs=fusion_outputs, name=name)
    loss_list = [DLR(MSLE(), fusion, 0), DLR(MSLE(), fusion, 1), DLR(RMSLE, fusion, 2), DLR(RMSLE, fusion, 3), DLR(MSLE(), fusion, 4), DLR(RMSLE, fusion, 5), DLR(RMSLE, fusion, 6), DLR(MSLE(), fusion, 7), DLR(RMSLE, fusion, 8), DLR(RMSLE, fusion, 9), DLR(RMSLE, fusion, 10), DLR(RMSLE, fusion, 11), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 12), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 13), DLR(RMSLE, fusion, 14), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 15)]
-   fusion.compile(optimizer=Adam(learning_rate=0.001), loss=loss_list, metrics=loss_list, run_eagerly=False, jit_compile=False, steps_per_execution=1)
+   fusion.compile(optimizer=Adam(learning_rate=0.001), loss=loss_list, metrics=loss_list, run_eagerly=False, jit_compile=True, steps_per_execution=1, auto_scale_loss=True)
    return fusion
 
 
