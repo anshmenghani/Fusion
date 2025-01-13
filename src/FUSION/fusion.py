@@ -10,7 +10,7 @@ algorithm to find twenty-three other parameters of a star such as Mass and surfa
 over 403 million features. The performance of this model varies depending on the star type and parameter it predicts but has an average 
 accuracy of [--] % and an average speed of [--] seconds per round of predictions. While this model is currently limited to stars on the 
 Hertzberg-Russell diagram (i.e., the model cannot make accurate predictions on other objects in the universe, such as a neutron star), its 
-main use is to better model the distant lights in our universe    
+main use is to better model the distant lights in our universe.    
 '''
 
 import os
