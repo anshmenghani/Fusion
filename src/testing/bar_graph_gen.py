@@ -6,7 +6,7 @@ import numpy as np
 param = "Average Prediction Accuracy"
 labels = ["Absolute Bolometric\nMagnitude", "Absolute Magnitude", "Absolute Bolometric\nLuminosity", "Mass", "Average Density", "Central Pressure", "Central\nTemperature", "Lifespan", "Surface Gravity", "Gravitational\nBinding Energy", "Bolometric Flux", "Potential Energy", "Spectral Class", "Luminosity Class", "Star Peak\nWavelength", "Star Type", "Average"]
 labels.reverse()
-metrics = list(np.random.uniform(low=0.5, high=1.0, size=16))
+metrics = list(np.random.uniform(low=0.9, high=1.0, size=16))
 metrics.append(np.average(metrics))
 metrics.reverse()
 
