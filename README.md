@@ -1,5 +1,15 @@
 # Fusion
-Physics is all about approximation. No one formula can account for every factor and predict any event with full accuracy. Over the years, scientists have used different methods to make these predictions, such as mathematical formulas and statistical models. This has been particularly difficult in fields such as astrophysics, where the subjects being studied are mindblowing distances away from Earth. In recent years, the advancements in machine learning, specifically in neural networks, allow us to computationally model far more complex relationships than before. The Fusion Stellar Model is designed to predict and classify stellar parameters more accurately than traditional methods. It takes inputs of a star's Effective Temperature, Luminosity, and Radius, and runs its Deep Neural Network algorithm to find twenty-three other parameters of a star such as Mass and surface Gravity. It was trained on the Gaia mission dataset with over 403 million features. While this model is currently limited to stars on the Hertzberg-Russell diagram (i.e., the model cannot make accurate predictions on other objects in the universe, such as a neutron star), its main use is to better model the distant lights in our universe.    
+Physics is all about approximation. No one formula can account for every factor and predict any event with full accuracy. 
+Over the years, scientists have used different methods to make these predictions, such as mathematical formulas and statistical 
+models. This has been particularly difficult in fields such as astrophysics, where the subjects being studied are mindblowing 
+distances away from Earth. In recent years, the advancements in machine learning, specifically in neural networks, allow us to 
+computationally model far more complex relationships than before. The Fusion Stellar Model is designed to predict and classify 
+stellar parameters more accurately than traditional methods. It takes inputs of a star's Effective Temperature, Luminosity, and 
+Radius, and runs its Deep Neural Network algorithm to find twenty-three other parameters of a star such as Mass and surface Gravity. 
+It was trained on the Gaia mission dataset with over 403 million features. The performance of this model varies depending on the star 
+type and parameter it predicts but has an average accuracy of [--] % and an average speed of [--] seconds per round of predictions. 
+While this model is currently limited to stars on the Hertzberg-Russell diagram (i.e., the model cannot make accurate predictions on 
+other objects in the universe, such as a neutron star), its main use is to better model the distant lights in our universe.  
 
 ## The Project
 The Fusion model is a deep neural network that can tackle regression and classification problems, depending on the parameter of a star it is predicting. Here are the required inputs and output parameters the model is compatible with: 
