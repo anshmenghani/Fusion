@@ -1,7 +1,7 @@
 # Fusion
 Physics is all about approximation. No one formula can account for every factor and predict any event with full accuracy. 
 Over the years, scientists have used different methods to make these predictions, such as mathematical formulas and statistical 
-models. This has been particularly difficult in fields such as astrophysics, where the subjects being studied are mindblowing 
+models. This has been particularly difficult in fields such as astrophysics, where the subjects being studied are mind blowing 
 distances away from Earth. In recent years, the advancements in machine learning, specifically in neural networks, allow us to 
 computationally model far more complex relationships than before. The Fusion Stellar Model is designed to predict and classify 
 stellar parameters more accurately than traditional methods. It takes inputs of a star's Effective Temperature, Luminosity, and 
