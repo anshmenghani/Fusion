@@ -54,12 +54,12 @@ def data_prep(df, inputs, outputs, mod_attrs, mod_funcs):
    y = df[outputs].iloc[:, :]
    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.05)
    
-   '''t_list = list(set(outputs) - set(mod_attrs))
+   t_list = list(set(outputs) - set(mod_attrs))
    robust_scaler = RobustScaler().set_output(transform="pandas")
    y_train = robust_scaler.fit_transform(y_train[t_list])
    for v in mod_attrs:
        y_train.insert(outputs.index(v), v, df[v])
-   y_train.columns = outputs'''
+   y_train.columns = outputs
 
    return x_train, x_test, y_train, y_test
 
@@ -90,7 +90,7 @@ class LambdaLayerClass(Layer):
     def build(self, input_shape):
         super(LambdaLayerClass, self).build(input_shape)
 
-    def call(self, inputs):
+    def call(self, inputs): #change this to a "func" lambda?
         if self.func == "mbol":
             return log10(inputs)
         elif self.func == "lbol":
