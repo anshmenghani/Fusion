@@ -1,4 +1,5 @@
 venv/
+report/
 src/data/formattedData/
 src/data/unformattedData/
 src/FUSION/FusionStellaarData.csv
