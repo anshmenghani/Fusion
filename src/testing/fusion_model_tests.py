@@ -12,6 +12,7 @@ y_test = list(test_data[1])
 
 
 def get_acc(y, y_hat):
+    y_hat = y_hat.inverse_transform(y_hat)
     return 100 - (100 * (abs(y-y_hat)/y))
 
 

@@ -6,12 +6,12 @@ from tensorflow.keras.saving import load_model
 import numpy as np
 import pandas as pd
 
+epsilon = 0.001
+
+
 def get_acc(y, y_hat):
-    epsilon = 1e-9
-    try:
-        return 100 - (100 * (abs(y-y_hat)/y))
-    except ZeroDivisionError:
-        return 100 - (100 * (abs(y-y_hat)/epsilon))
+    print(y, y_hat)
+    return 100 - (100 * (abs((y-y_hat)/y)))
 
 
 x_test = pd.read_csv("src/FUSION/testData/x_test.csv", nrows=100)
@@ -29,9 +29,10 @@ for idx, i in enumerate(x_test.values.tolist()):
             pred = float(pred)
             y = float(y_test.values.tolist()[idx][id])
         except (ValueError, TypeError):
-            pred = np.argmax(pred)
-            y = np.argmax(np.fromstring(y_test.values.tolist()[idx][id].replace("[", "").replace("]", ""), sep=" "))
+            pred = np.argmax(pred) + epsilon
+            y = np.argmax(np.fromstring(y_test.values.tolist()[idx][id].replace("[", "").replace("]", ""), sep=" ")) + epsilon
         acc_list.append(get_acc(pred, y))
     accuracy_list.append(acc_list)
     
 print([a[-1] for a in accuracy_list])
+print(accuracy_list)

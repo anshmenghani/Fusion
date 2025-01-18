@@ -10,7 +10,7 @@ Radius, and runs its Deep Neural Network algorithm to find twenty-three other pa
 It was trained on the Gaia mission dataset with over 403 million features. The performance of this model varies depending on the star 
 type and parameter it predicts but has an average accuracy of [--] % and an average speed of [--] seconds per round of predictions. 
 While this model is currently limited to stars on the Hertzberg-Russell diagram (i.e., the model cannot make accurate predictions on 
-other objects in the universe, such as a neutron star), its main use is to better model the distant lights in our universe.        
+other objects in the universe, such as a neutron star), its main use is to better model the distant lights in our universe.   
 '''
 
 import os
@@ -20,6 +20,7 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0" # Turn off the Tesorflow OneDNN option
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import RobustScaler
+import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 from tensorflow.keras.layers import Layer, Input, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, PReLU, Softmax, Cropping1D, Reshape
@@ -40,7 +41,7 @@ from tensorflow.experimental.numpy import log10
 gen_inputs = None
 submodelCount = 0
 prev_val_loss = Variable(0, dtype=float32)
-curr_val_loss = Variable(0, dtype=float32)
+curr_val_loss = Variable(1, dtype=float32)
 
 
 # Prepare training and testing data from dataframe
@@ -54,12 +55,12 @@ def data_prep(df, inputs, outputs, mod_attrs, mod_funcs):
    y = df[outputs].iloc[:, :]
    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.05)
    
-   t_list = list(set(outputs) - set(mod_attrs))
+   '''t_list = list(set(outputs) - set(mod_attrs))
    robust_scaler = RobustScaler().set_output(transform="pandas")
    y_train = robust_scaler.fit_transform(y_train[t_list])
    for v in mod_attrs:
        y_train.insert(outputs.index(v), v, df[v])
-   y_train.columns = outputs
+   y_train.columns = outputs'''
 
    return x_train, x_test, y_train, y_test
 
@@ -90,7 +91,7 @@ class LambdaLayerClass(Layer):
     def build(self, input_shape):
         super(LambdaLayerClass, self).build(input_shape)
 
-    def call(self, inputs): #change this to a "func" lambda?
+    def call(self, inputs):
         if self.func == "mbol":
             return log10(inputs)
         elif self.func == "lbol":
@@ -133,7 +134,7 @@ class LambdaLayerClass(Layer):
 # Constrains the validation loss reward ratio weight to a reasonable size
 class ValLossRewardConstraint(Constraint):
     def __call__(self, weights):
-        return clip_by_value(weights, 0.001, 10)
+        return clip_by_value(weights, 0.001, 1)
 
 
 # Trains a weight to reward the model for improvments in validation loss
@@ -145,9 +146,8 @@ class LossRewardOptimizer(Layer):
 
     def build(self, input_shape):
         def reward_initializer(shape, dtype=None):
-            reward_init = np.mean(np.clip(np.random.normal(0.55, 0.2, 32), 0.1, 1))
-            return(constant(0, shape=(1,), dtype=float32))
-            #return constant(reward_init, shape=(1,), dtype=float32)
+            reward_init = np.mean(np.clip(np.random.normal(0.55, 0.2, 32), 0.001, 0.01))
+            return constant(reward_init, shape=(1,), dtype=float32)
         
         self.lro_alpha = self.add_weight(name="lro_alpha", shape=(1,), initializer=reward_initializer, trainable=True, constraint=ValLossRewardConstraint())
 
@@ -189,10 +189,9 @@ class DLR(Loss):
     def call(self, y_true, y_pred):
         global prev_val_loss
         global curr_val_loss
-        #val_loss_rewardRatio = self.model.get_layer("lroLayer{}".format(str(self.count))).lro_alpha
-        val_loss_rewardRatio = 0.
+        val_loss_rewardRatio = self.model.get_layer("lroLayer{}".format(str(self.count))).lro_alpha
         init_loss = self.init_loss_func(y_true, y_pred)
-        loss_reward = cast(val_loss_rewardRatio, float32) * (cast(prev_val_loss, float32) - cast(curr_val_loss, float32))
+        loss_reward = (cast(val_loss_rewardRatio, float32) * (cast(prev_val_loss, float32) - cast(curr_val_loss, float32))) / cast(curr_val_loss, float32)
         final_loss = cast(init_loss, float32) - cast(loss_reward, float32)
         return convert_to_tensor(final_loss, dtype=float32)
     
@@ -280,7 +279,7 @@ def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True,
        combine = concatenate([hidden_input, selective_hidden_special], name="combine{}".format(submodelCount))
        combine = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(combine)
    else:
-    combine = hidden_input
+       combine = hidden_input
 
    hidden1 = Dense(64, activation=gelu, kernel_regularizer="L1L2", bias_regularizer="L1L2", activity_regularizer="L1L2", name="hidden1_{}".format(submodelCount))(combine)
    hidden1 = PReLU()(hidden1)
@@ -352,7 +351,7 @@ def Fuse():
 
    Fusion = fuseModels(createModels(), name="Fusion")
    earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=5, baseline=None, mode="min", verbose=2, restore_best_weights=True)
-   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=20, batch_size=64, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=1)
+   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=11, batch_size=64, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=1)
    Fusion.save("src/FUSION/fusionModel.keras")
    pd.DataFrame(x_test, columns=x_cols).to_csv("src/FUSION/testData/x_test.csv")
    pd.DataFrame(y_test, columns=y_cols).to_csv("src/FUSION/testData/y_test.csv")
