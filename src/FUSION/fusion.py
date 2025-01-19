@@ -340,7 +340,7 @@ def fuseModels(models, name):
 
 # Train the model and return the trained model and testing data 
 def Fuse():
-   dataset = pd.read_csv(r"src/FUSION/FusionStellaarData.csv")
+   dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv")
    prep_func6 = lambda inpVec: to_categorical(inpVec, num_classes=6)
    prep_func7 = lambda inpVec: to_categorical(inpVec, num_classes=7)
    x_cols = ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"]

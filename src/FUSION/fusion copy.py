@@ -20,9 +20,9 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0" # Turn off the Tesorflow OneDNN option
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import RobustScaler
-import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
+import joblib
 from tensorflow.keras.layers import Layer, Input, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, PReLU, Softmax, Cropping1D, Reshape
 from tensorflow.keras import backend as K
 from tensorflow.keras.saving import register_keras_serializable
@@ -31,10 +31,10 @@ from tensorflow.keras.constraints import Constraint
 from tensorflow.keras.losses import MeanSquaredLogarithmicError as MSLE, CategoricalCrossentropy as CCE, Loss
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.activations import gelu
+from tensorflow.keras.ops import log10, tanh
 from tensorflow.keras.utils import to_categorical
 from tensorflow import TensorShape, constant, cast, clip_by_value, convert_to_tensor, Variable, float32
 import tensorflow.keras.callbacks as callbacks
-from tensorflow.experimental.numpy import log10
 
 
 # Set initial global variables
@@ -55,12 +55,13 @@ def data_prep(df, inputs, outputs, mod_attrs, mod_funcs):
    y = df[outputs].iloc[:, :]
    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.05)
    
-   '''t_list = list(set(outputs) - set(mod_attrs))
+   t_list = list(set(outputs) - set(mod_attrs))
    robust_scaler = RobustScaler().set_output(transform="pandas")
    y_train = robust_scaler.fit_transform(y_train[t_list])
    for v in mod_attrs:
        y_train.insert(outputs.index(v), v, df[v])
-   y_train.columns = outputs'''
+   y_train.columns = outputs
+   joblib.dump(robust_scaler, "src/FUSION/fusionStandard.pkl")
 
    return x_train, x_test, y_train, y_test
 
@@ -134,7 +135,7 @@ class LambdaLayerClass(Layer):
 # Constrains the validation loss reward ratio weight to a reasonable size
 class ValLossRewardConstraint(Constraint):
     def __call__(self, weights):
-        return clip_by_value(weights, 0.001, 1)
+        return clip_by_value(weights, 0.001, 3)
 
 
 # Trains a weight to reward the model for improvments in validation loss
@@ -146,7 +147,7 @@ class LossRewardOptimizer(Layer):
 
     def build(self, input_shape):
         def reward_initializer(shape, dtype=None):
-            reward_init = np.mean(np.clip(np.random.normal(0.55, 0.2, 32), 0.001, 0.01))
+            reward_init = np.mean(np.clip(np.random.normal(0.55, 0.2, 32), 0.001, 1))
             return constant(reward_init, shape=(1,), dtype=float32)
         
         self.lro_alpha = self.add_weight(name="lro_alpha", shape=(1,), initializer=reward_initializer, trainable=True, constraint=ValLossRewardConstraint())
@@ -191,7 +192,7 @@ class DLR(Loss):
         global curr_val_loss
         val_loss_rewardRatio = self.model.get_layer("lroLayer{}".format(str(self.count))).lro_alpha
         init_loss = self.init_loss_func(y_true, y_pred)
-        loss_reward = (cast(val_loss_rewardRatio, float32) * (cast(prev_val_loss, float32) - cast(curr_val_loss, float32))) / cast(curr_val_loss, float32)
+        loss_reward = tanh(cast(val_loss_rewardRatio, float32)) * tanh((cast(prev_val_loss, float32) - cast(curr_val_loss, float32)) / cast(prev_val_loss, float32))
         final_loss = cast(init_loss, float32) - cast(loss_reward, float32)
         return convert_to_tensor(final_loss, dtype=float32)
     
@@ -341,7 +342,7 @@ def fuseModels(models, name):
 
 # Train the model and return the trained model and testing data 
 def Fuse():
-   dataset = pd.read_csv(r"src/FUSION/FusionStellaarData.csv", nrows=100000)
+   dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv", nrows=100000)
    prep_func6 = lambda inpVec: to_categorical(inpVec, num_classes=6)
    prep_func7 = lambda inpVec: to_categorical(inpVec, num_classes=7)
    x_cols = ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"]
@@ -351,7 +352,7 @@ def Fuse():
 
    Fusion = fuseModels(createModels(), name="Fusion")
    earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=5, baseline=None, mode="min", verbose=2, restore_best_weights=True)
-   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=11, batch_size=64, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=1)
+   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=100, batch_size=64, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=1)
    Fusion.save("src/FUSION/fusionModel.keras")
    pd.DataFrame(x_test, columns=x_cols).to_csv("src/FUSION/testData/x_test.csv")
    pd.DataFrame(y_test, columns=y_cols).to_csv("src/FUSION/testData/y_test.csv")
