@@ -22,7 +22,6 @@ import pandas as pd
 from sklearn.preprocessing import RobustScaler
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
-import joblib
 from tensorflow.keras.layers import Layer, Input, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, PReLU, Softmax, Cropping1D, Reshape
 from tensorflow.keras import backend as K
 from tensorflow.keras.saving import register_keras_serializable
@@ -61,7 +60,8 @@ def data_prep(df, inputs, outputs, mod_attrs, mod_funcs):
    for v in mod_attrs:
        y_train.insert(outputs.index(v), v, df[v])
    y_train.columns = outputs
-   joblib.dump(robust_scaler, "src/FUSION/fusionStandard.pkl")
+   y_train.to_csv("src/FUSION/testData/y_train.csv")
+   # or just inverse transform in this script / transform and save y_test in this script  
 
    return x_train, x_test, y_train, y_test
 
@@ -352,7 +352,7 @@ def Fuse():
 
    Fusion = fuseModels(createModels(), name="Fusion")
    earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=5, baseline=None, mode="min", verbose=2, restore_best_weights=True)
-   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=100, batch_size=64, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=1)
+   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=1, batch_size=64, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=1)
    Fusion.save("src/FUSION/fusionModel.keras")
    pd.DataFrame(x_test, columns=x_cols).to_csv("src/FUSION/testData/x_test.csv")
    pd.DataFrame(y_test, columns=y_cols).to_csv("src/FUSION/testData/y_test.csv")
