@@ -10,7 +10,7 @@ It was trained on the Gaia mission dataset with over 403 million features. The p
 type and parameter it predicts but has an average accuracy of [--] % and an average speed of [--] seconds per round of predictions. 
 While this model is currently limited to stars on the Hertzberg-Russell diagram (i.e., the model cannot make accurate predictions on 
 other objects in the universe, such as a neutron star), its main use is to better model the distant lights in our universe.  
-
+ 
 ## The Project
 The Fusion model is a deep neural network that can tackle regression and classification problems, depending on the parameter of a star it is predicting. Here are the required inputs and output parameters the model is compatible with: 
 ### Inputs (at least two of the following)
