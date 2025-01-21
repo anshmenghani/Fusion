@@ -57,3 +57,7 @@ for idx, i in enumerate(x_test.values.tolist()):
 def get_fusion_acc():
     return accuracy_list
 
+
+def get_evaluation():
+    return fusion_model.evaluate(x_test, y_test)
+
