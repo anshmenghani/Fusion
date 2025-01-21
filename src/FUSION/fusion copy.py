@@ -361,5 +361,6 @@ def Fuse():
    return Fusion, (x_test, y_test)
 
 
+# To save output to a text file, run this file with '> fusionTraining.txt' ('python fusion.py > fusionTraining.txt')
 if __name__ == "__main__":
    Fuse()
