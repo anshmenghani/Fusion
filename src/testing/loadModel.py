@@ -3,7 +3,7 @@ import sys
 sys.path.insert(1, "src/FUSION")
 from fusion import LossRewardOptimizer, LambdaLayerClass, DLR
 from tensorflow.keras.saving import load_model
-from sklearn.preprocessing import RobustScaler
+import joblib
 import numpy as np
 import pandas as pd
 
@@ -17,8 +17,7 @@ def get_acc(y, y_hat, i=None):
 
 
 cols = ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "StarPeakWavelength(nm)"]
-scaler = RobustScaler().set_output(transform="pandas")
-scaler.fit_transform(pd.read_csv("src/FUSION/testData/y_train.csv", nrows=100)[cols])
+scaler = joblib.load("src/FUSION/fusionStandard.pkl")
 x_test = pd.read_csv("src/FUSION/testData/x_test.csv", nrows=100)
 x_test = x_test.iloc[:, 1:]
 y_test = pd.read_csv("src/FUSION/testData/y_test.csv", nrows=100)
@@ -26,9 +25,24 @@ y_test = y_test.iloc[:, 1:]
 fusion_model = load_model("src/FUSION/fusionModel.keras", custom_objects={"DLR": DLR, "LambdaLayerClass": LambdaLayerClass, "LossRewardOptimizer": LossRewardOptimizer}, safe_mode=False)
 accuracy_list = []
 
-for idx, i in enumerate(x_test.values.tolist()):
+print(x_test.values.tolist()[88])
+tester = np.array([x_test.values.tolist()[9]])
+pred = fusion_model.predict(tester)
+feat = [i.tolist() for i in pred]
+trunc = feat[:12] + feat[14] 
+trunc2 = []
+for i in trunc:
+    try:
+        trunc2.append(i[0][0])
+    except TypeError:
+        trunc2.append(i[0])
+
+og = scaler.inverse_transform(np.array([trunc2]).reshape(1, -1)).flatten().tolist()
+true = y_test.values.tolist()[5]
+
+'''for idx, i in enumerate(x_test.values.tolist()):
     prediction = fusion_model.predict(np.array([i]))
-    prediction = [x[0] if isinstance(x[0], int) else x[0] for x in [i.tolist() for i in prediction]]
+    #prediction = [x[0] if isinstance(x[0], int) else x[0] for x in [i.tolist() for i in prediction]]
     prediction_trunc = prediction[0:12] + [prediction[14]] 
     for idx, i in enumerate(prediction_trunc):
         prediction_trunc[idx] = i[0]
@@ -55,6 +69,6 @@ for i in accuracy_list:
     for idx, x in enumerate(i):
         l[idx].append(x)
 
-print([sum(i)/len(i) for i in l])
+print([sum(i)/len(i) for i in l])'''
     
 #print(accuracy_list)

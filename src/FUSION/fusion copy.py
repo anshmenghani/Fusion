@@ -22,6 +22,7 @@ import pandas as pd
 from sklearn.preprocessing import RobustScaler
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
+import joblib
 from tensorflow.keras.layers import Layer, Input, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, PReLU, Softmax, Cropping1D, Reshape
 from tensorflow.keras import backend as K
 from tensorflow.keras.saving import register_keras_serializable
@@ -55,13 +56,13 @@ def data_prep(df, inputs, outputs, mod_attrs, mod_funcs):
    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.05)
    
    t_list = list(set(outputs) - set(mod_attrs))
-   robust_scaler = RobustScaler().set_output(transform="pandas")
-   y_train = robust_scaler.fit_transform(y_train[t_list])
+   t_list = [i for i in outputs if i not in mod_attrs]
+   robust_scaler = RobustScaler().set_output(transform="pandas").fit(y_train[t_list])
+   y_train = robust_scaler.transform(y_train[t_list])
    for v in mod_attrs:
        y_train.insert(outputs.index(v), v, df[v])
    y_train.columns = outputs
-   y_train.to_csv("src/FUSION/testData/y_train.csv")
-   # or just inverse transform in this script / transform and save y_test in this script  
+   joblib.dump(robust_scaler, "src/FUSION/fusionStandard.pkl")
 
    return x_train, x_test, y_train, y_test
 
