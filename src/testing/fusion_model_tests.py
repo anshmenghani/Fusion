@@ -1,51 +1,58 @@
-# Gets Fusion model predictions and evaluates their speed and accuracy
+# Returns Fusion accuracy by test sample 
 
 import sys 
 sys.path.insert(1, "src/FUSION")
-import fusion
+from fusion import LossRewardOptimizer, LambdaLayerClass, DLR
+from tensorflow.keras.saving import load_model
+import joblib
 import numpy as np
-import time
+import pandas as pd
 
-model, test_data = fusion.Fuse()
-x_test = list(test_data[0])
-y_test = list(test_data[1])
+def get_acc(y, y_hat, i=None):
+    if i is not None:
+        length = len(i)
+        acc = 100 - (100 * ((abs(y - y_hat)) / length))
+        return acc
+    acc = 100 - (100 * (abs((y-y_hat)/y)))
+    return acc
 
 
-def get_acc(y, y_hat):
-    y_hat = y_hat.inverse_transform(y_hat)
-    return 100 - (100 * (abs(y-y_hat)/y))
+cols = ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "StarPeakWavelength(nm)"]
+scaler = joblib.load("src/FUSION/fusionStandard.pkl")
+x_test = pd.read_csv("src/FUSION/testData/x_test.csv", nrows=100)
+x_test = x_test.iloc[:, 1:]
+y_test = pd.read_csv("src/FUSION/testData/y_test.csv", nrows=100)
+y_test = y_test.iloc[:, 1:]
+fusion_model = load_model("src/FUSION/fusionModel.keras", custom_objects={"DLR": DLR, "LambdaLayerClass": LambdaLayerClass, "LossRewardOptimizer": LossRewardOptimizer}, safe_mode=False)
+accuracy_list = []
 
+for idx, i in enumerate(x_test.values.tolist()):
+    prediction = fusion_model.predict(np.array([i]))
+    feat = [i.tolist() for i in prediction]
+    trunc = feat[:12] + feat[14] 
+    trunc2 = []
+    for i in trunc:
+        try:
+            trunc2.append(i[0][0])
+        except TypeError:
+            trunc2.append(i[0])
+    prediction = scaler.inverse_transform(np.array([trunc2]).reshape(1, -1)).flatten().tolist()
+    prediction.insert(12, feat[12][0])
+    prediction.insert(13, feat[13][0])
+    prediction.insert(15, feat[15][0])
 
-def get_fusion_pred_data():
-    predictions_acc = []
-    times = []
-    for idx in range(x_test):
-        acc_list = []
-
-        start = time.time()
-        prediction = model.predict(np.array(x_test))
-        end = time.time()
-        times.append(end - start)
+    acc_list = []
+    for id, pred in enumerate(prediction):
+        try:
+            y = float(y_test.values.tolist()[idx][id])
+            acc_list.append(get_acc(y, pred))
+        except (ValueError, TypeError):
+            pred2 = np.argmax(pred)
+            y = np.argmax(np.fromstring(y_test.values.tolist()[idx][id].replace("[", "").replace("]", ""), sep=" "))
+            acc_list.append(get_acc(y, pred2, pred))
         
-        prediction = list(prediction)
-        for pidx, p in enumerate(prediction):
-            real_y = y_test[idx][pidx]
-            if type(real_y) == float or type(real_y) == int:
-                acc_list.append(get_acc(real_y, p))
-            else:
-                max_val = np.argmax(p)
-                z = list(np.zeros(len(real_y)))
-                z[max_val] = 1.
-                if real_y == z:
-                    acc_list.append(1.)
-                else:
-                    acc_list.append(0.)
+    accuracy_list.append(acc_list)
+    
 
-        acc_list.append(np.average(acc_list))
-        predictions_acc.append(acc_list)
-
-    return predictions_acc, times
-
-
-def get_evaluation():
-    model.evaluate(x_test, y_test)
+def get_fusion_acc():
+    return accuracy_list
