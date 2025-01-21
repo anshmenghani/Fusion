@@ -1,3 +1,4 @@
+# Returns Fusion accuracy by test sample 
 
 import sys 
 sys.path.insert(1, "src/FUSION")
@@ -9,8 +10,8 @@ import pandas as pd
 
 def get_acc(y, y_hat, i=None):
     if i is not None:
-        length = len(i[0])
-        acc = (abs(length - y_hat)) / length
+        length = len(i)
+        acc = 100 - (100 * ((abs(y - y_hat)) / length))
         return acc
     acc = 100 - (100 * (abs((y-y_hat)/y)))
     return acc
@@ -25,33 +26,21 @@ y_test = y_test.iloc[:, 1:]
 fusion_model = load_model("src/FUSION/fusionModel.keras", custom_objects={"DLR": DLR, "LambdaLayerClass": LambdaLayerClass, "LossRewardOptimizer": LossRewardOptimizer}, safe_mode=False)
 accuracy_list = []
 
-print(x_test.values.tolist()[88])
-tester = np.array([x_test.values.tolist()[9]])
-pred = fusion_model.predict(tester)
-feat = [i.tolist() for i in pred]
-trunc = feat[:12] + feat[14] 
-trunc2 = []
-for i in trunc:
-    try:
-        trunc2.append(i[0][0])
-    except TypeError:
-        trunc2.append(i[0])
-
-og = scaler.inverse_transform(np.array([trunc2]).reshape(1, -1)).flatten().tolist()
-true = y_test.values.tolist()[5]
-
-'''for idx, i in enumerate(x_test.values.tolist()):
+for idx, i in enumerate(x_test.values.tolist()):
     prediction = fusion_model.predict(np.array([i]))
-    #prediction = [x[0] if isinstance(x[0], int) else x[0] for x in [i.tolist() for i in prediction]]
-    prediction_trunc = prediction[0:12] + [prediction[14]] 
-    for idx, i in enumerate(prediction_trunc):
-        prediction_trunc[idx] = i[0]
+    feat = [i.tolist() for i in prediction]
+    trunc = feat[:12] + feat[14] 
+    trunc2 = []
+    for i in trunc:
+        try:
+            trunc2.append(i[0][0])
+        except TypeError:
+            trunc2.append(i[0])
+    prediction = scaler.inverse_transform(np.array([trunc2]).reshape(1, -1)).flatten().tolist()
+    prediction.insert(12, feat[12][0])
+    prediction.insert(13, feat[13][0])
+    prediction.insert(15, feat[15][0])
 
-    prediction_trunc = np.array(prediction_trunc).reshape(-1, 1)
-    prediction_trunc = np.tile(prediction_trunc, (1, 13))
-    print(prediction_trunc, end="\n\n\n")
-    prediction_trunc = scaler.inverse_transform(prediction_trunc)
-    print(prediction_trunc)
     acc_list = []
     for id, pred in enumerate(prediction):
         try:
@@ -64,11 +53,7 @@ true = y_test.values.tolist()[5]
         
     accuracy_list.append(acc_list)
     
-l = [[] for _ in range(16)]
-for i in accuracy_list:
-    for idx, x in enumerate(i):
-        l[idx].append(x)
 
-print([sum(i)/len(i) for i in l])'''
-    
-#print(accuracy_list)
+def get_fusion_acc():
+    return accuracy_list
+
