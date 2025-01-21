@@ -123,7 +123,7 @@ class LambdaLayerClass(Layer):
         config.update({
             "name": self.name, 
             "func": self.func
-            })
+        })
         return config    
     
     @classmethod
@@ -165,7 +165,7 @@ class LossRewardOptimizer(Layer):
         config = super(LossRewardOptimizer, self).get_config()
         config.update({
             "name": self.name,
-            })
+        })
         return config
 
     @classmethod
