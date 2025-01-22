@@ -22,6 +22,7 @@ import pandas as pd
 from sklearn.preprocessing import RobustScaler
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
+import joblib
 from tensorflow.keras.layers import Layer, Input, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, PReLU, Softmax, Cropping1D, Reshape
 from tensorflow.keras import backend as K
 from tensorflow.keras.saving import register_keras_serializable
@@ -30,17 +31,17 @@ from tensorflow.keras.constraints import Constraint
 from tensorflow.keras.losses import MeanSquaredLogarithmicError as MSLE, CategoricalCrossentropy as CCE, Loss
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.activations import gelu
+from tensorflow.keras.ops import log10, tanh
 from tensorflow.keras.utils import to_categorical
 from tensorflow import TensorShape, constant, cast, clip_by_value, convert_to_tensor, Variable, float32
 import tensorflow.keras.callbacks as callbacks
-from tensorflow.experimental.numpy import log10
 
 
 # Set initial global variables
 gen_inputs = None
 submodelCount = 0
 prev_val_loss = Variable(0, dtype=float32)
-curr_val_loss = Variable(0, dtype=float32)
+curr_val_loss = Variable(1, dtype=float32)
 
 
 # Prepare training and testing data from dataframe
@@ -55,12 +56,14 @@ def data_prep(df, inputs, outputs, mod_attrs, mod_funcs):
    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.05)
    
    t_list = list(set(outputs) - set(mod_attrs))
-   robust_scaler = RobustScaler().set_output(transform="pandas")
-   y_train = robust_scaler.fit_transform(y_train[t_list])
+   t_list = [i for i in outputs if i not in mod_attrs]
+   robust_scaler = RobustScaler().set_output(transform="pandas").fit(y_train[t_list])
+   y_train = robust_scaler.transform(y_train[t_list])
    for v in mod_attrs:
        y_train.insert(outputs.index(v), v, df[v])
    y_train.columns = outputs
-
+   joblib.dump(robust_scaler, "src/FUSION/fusionStandard.pkl")
+   
    return x_train, x_test, y_train, y_test
 
 
@@ -120,7 +123,7 @@ class LambdaLayerClass(Layer):
         config.update({
             "name": self.name, 
             "func": self.func
-            })
+        })
         return config    
     
     @classmethod
@@ -133,7 +136,7 @@ class LambdaLayerClass(Layer):
 # Constrains the validation loss reward ratio weight to a reasonable size
 class ValLossRewardConstraint(Constraint):
     def __call__(self, weights):
-        return clip_by_value(weights, 0.001, 10)
+        return clip_by_value(weights, 0.001, 3)
 
 
 # Trains a weight to reward the model for improvments in validation loss
@@ -145,7 +148,7 @@ class LossRewardOptimizer(Layer):
 
     def build(self, input_shape):
         def reward_initializer(shape, dtype=None):
-            reward_init = np.mean(np.clip(np.random.normal(0.55, 0.2, 32), 0.1, 1))
+            reward_init = np.mean(np.clip(np.random.normal(0.55, 0.2, 32), 0.001, 1))
             return constant(reward_init, shape=(1,), dtype=float32)
         
         self.lro_alpha = self.add_weight(name="lro_alpha", shape=(1,), initializer=reward_initializer, trainable=True, constraint=ValLossRewardConstraint())
@@ -162,7 +165,7 @@ class LossRewardOptimizer(Layer):
         config = super(LossRewardOptimizer, self).get_config()
         config.update({
             "name": self.name,
-            })
+        })
         return config
 
     @classmethod
@@ -190,7 +193,7 @@ class DLR(Loss):
         global curr_val_loss
         val_loss_rewardRatio = self.model.get_layer("lroLayer{}".format(str(self.count))).lro_alpha
         init_loss = self.init_loss_func(y_true, y_pred)
-        loss_reward = cast(val_loss_rewardRatio, float32) * (cast(prev_val_loss, float32) - cast(curr_val_loss, float32))
+        loss_reward = tanh(cast(val_loss_rewardRatio, float32)) * tanh((cast(prev_val_loss, float32) - cast(curr_val_loss, float32)) / cast(prev_val_loss, float32))
         final_loss = cast(init_loss, float32) - cast(loss_reward, float32)
         return convert_to_tensor(final_loss, dtype=float32)
     
@@ -349,7 +352,7 @@ def Fuse():
    y_train = [np.stack(y_train[l]) for l in list(y_train)]
 
    Fusion = fuseModels(createModels(), name="Fusion")
-   earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=2, baseline=None, mode="min", verbose=2, restore_best_weights=True)
+   earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=5, baseline=None, mode="min", verbose=2, restore_best_weights=True)
    Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=11, batch_size=64, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=1)
    Fusion.save("src/FUSION/fusionModel.keras")
    pd.DataFrame(x_test, columns=x_cols).to_csv("src/FUSION/testData/x_test.csv")
@@ -358,5 +361,7 @@ def Fuse():
    return Fusion, (x_test, y_test)
 
 
+# To save output to a text file, run this file with '> fusionTraining.txt' ('python fusion.py > fusionTraining.txt')
 if __name__ == "__main__":
    Fuse()
+   
