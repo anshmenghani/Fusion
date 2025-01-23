@@ -23,7 +23,7 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 import joblib
-from tensorflow.keras.layers import Layer, Input, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, PReLU, Softmax, Cropping1D, Reshape
+from tensorflow.keras.layers import Layer, Input, Embedding, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, PReLU, Cropping1D, Reshape
 from tensorflow.keras import backend as K
 from tensorflow.keras.saving import register_keras_serializable
 from tensorflow.keras.models import Model
@@ -32,7 +32,6 @@ from tensorflow.keras.losses import MeanSquaredLogarithmicError as MSLE, Categor
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.activations import gelu
 from tensorflow.keras.ops import log10, tanh
-from tensorflow.keras.utils import to_categorical
 from tensorflow import TensorShape, constant, cast, clip_by_value, convert_to_tensor, Variable, float32
 import tensorflow.keras.callbacks as callbacks
 
@@ -45,12 +44,8 @@ curr_val_loss = Variable(1, dtype=float32)
 
 
 # Prepare training and testing data from dataframe
-def data_prep(df, inputs, outputs, mod_attrs, mod_funcs):
+def data_prep(df, inputs, outputs, mod_attrs):
    df = shuffle(df)   
-   for idx, m in enumerate(mod_attrs):
-       modded = df[m].apply(mod_funcs[idx])
-       df[m] = modded
-
    x = df[inputs].iloc[:, :]
    y = df[outputs].iloc[:, :]
    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.05)
@@ -135,6 +130,28 @@ class LambdaLayerClass(Layer):
         return cls(name=name, func=func)
 
 
+# Slice layers for desired inputs 
+def lambda_init(in_layer, indices, no_right=False):
+   in_shape = in_layer.shape[1]
+   inter1 = Reshape((in_shape, 1))(in_layer)
+   
+   raw_lambda_list = []
+   for i in indices:
+       if no_right:
+           inter2 = Cropping1D(cropping=(i - 1, 0))(inter1)
+       else:
+           inter2 = Cropping1D(cropping=(i, in_shape - i - 1))(inter1)
+       raw_lambda_list.append(inter2)
+   reshaped_lambda_list = []
+   for r in raw_lambda_list:
+       inter3 = Reshape((1,))(r)
+       reshaped_lambda_list.append(inter3)
+   
+   if len(reshaped_lambda_list) > 1:
+       return reshaped_lambda_list
+   return reshaped_lambda_list[0]
+
+
 # Constrains the validation loss reward ratio weight to a reasonable size
 class ValLossRewardConstraint(Constraint):
     def __call__(self, weights):
@@ -216,25 +233,6 @@ class DLR(Loss):
         return cls(init_loss_func=init_loss_func, model=model, count=count)
 
 
-# Slice lambda layers for desired inputs 
-def lambda_init(in_layer, indices):
-   in_shape = in_layer.shape[1]
-   inter1 = Reshape((in_shape, 1))(in_layer)
-   
-   raw_lambda_list = []
-   for i in indices:
-       inter2 = Cropping1D(cropping=(i, in_shape - i - 1))(inter1)
-       raw_lambda_list.append(inter2)
-   reshaped_lambda_list = []
-   for r in raw_lambda_list:
-       inter3 = Reshape((1,))(r)
-       reshaped_lambda_list.append(inter3)
-   
-   if len(reshaped_lambda_list) > 1:
-       return reshaped_lambda_list
-   return reshaped_lambda_list[0]
-
-
 # Define the lambda layers of the model
 def lambda_functors():
    mbol_lam = LambdaLayerClass(name="llcLayer0", func="mbol")
@@ -252,7 +250,7 @@ def lambda_functors():
 
 
 # Create each output's individual submodel
-def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True, bound=None, output_neurons=1, output_actv=None):
+def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True, bound=None, embed=False, embed_dim=None, output_neurons=1):
    global gen_inputs
    global submodelCount
 
@@ -261,11 +259,15 @@ def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True,
        gen_inputs = input_layer
    else:
        input_layer = gen_inputs
+   if embed:
+       embedded = Embedding(input_dim=embed_dim, output_dim=2)(lambda_init(input_layer, embed, no_right=True))
+   else:
+       embedded = input_layer
    if norm is True:
-       norm_input = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(input_layer)
+       norm_input = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(embedded)
    else:
        norm_input = Discretization(bin_boundaries=norm, output_mode="int", name="disc{}".format(submodelCount))(lambda_init(input_layer, bound))
-       norm_input = concatenate([norm_input, input_layer])
+       norm_input = concatenate([embedded, Reshape((1, 1))(norm_input)])
        norm_input = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(norm_input)
 
    hidden_input = Dense(32, activation=gelu, kernel_regularizer="L1L2", bias_regularizer="L1L2", activity_regularizer="L1L2", name="hidden_input{}".format(submodelCount))(norm_input)
@@ -274,7 +276,7 @@ def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True,
    hidden_input = GaussianDropout(0.5)(hidden_input)
 
    if lambda_layer:
-       selective_lambda_inputs_layer = lambda_init(input_layer, lambda_inputs)
+       selective_lambda_inputs_layer = lambda_init(embedded, lambda_inputs)
        selective_special_lambda_layer = lambda_layer(selective_lambda_inputs_layer)
        selective_hidden_special = Dense(32, activation=gelu, kernel_regularizer="L1L2", bias_regularizer="L1L2", activity_regularizer="L1L2", name="selective_hidden_special{}".format(submodelCount))(selective_special_lambda_layer)
        selective_hidden_special = PReLU()(selective_hidden_special)
@@ -299,11 +301,8 @@ def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True,
    hidden3 = PReLU()(hidden3)
 
    output = Dense(output_neurons, name="output_layer{}".format(submodelCount))(hidden3)
-   if output_actv is not None:
-       output = output_actv(output)
-       output.name += str(submodelCount)
-
    lro_layer = LossRewardOptimizer(name="lroLayer{}".format(submodelCount))(output)
+   lro_layer = Reshape((1,))(lro_layer)
    gen_inputs = concatenate([gen_inputs, lro_layer], name="upd_inputs_with_new_output{}".format(submodelCount))
    submodelCount += 1
 
@@ -326,10 +325,10 @@ def createModels():
    grav_bind_submodel = createSubModel(lambda_layer=grav_bind_lam, lambda_inputs=[11, 2])
    flux_submodel = createSubModel(lambda_layer=flux_lam, lambda_inputs=[0])
    metallicity_submodel = createSubModel()
-   spectral_class_submodel = createSubModel(norm=[0., 4000., 5200., 7000., 12000., 20000., 34000., 420000.], bound=[0], output_neurons=7, output_actv=Softmax())
-   lum_class_submodel = createSubModel(norm=[0., 25., 100., 1300., 8000., 125000.], bound=[1], output_neurons=7, output_actv=Softmax())
+   spectral_class_submodel = createSubModel(norm=[0., 4000., 5200., 7000., 12000., 20000., 34000., 420000.], bound=[0], embed=[20], embed_dim=7)
+   lum_class_submodel = createSubModel(norm=[0., 25., 100., 1300., 8000., 125000.], bound=[1], embed=[21], embed_dim=7)
    peak_wavelength_submodel = createSubModel(lambda_layer=peak_wavelength_lam, lambda_inputs=[0])
-   star_type_submodel = createSubModel(output_neurons=6, output_actv=Softmax())
+   star_type_submodel = createSubModel(embed=[23], embed_dim=6)
 
    return [mbol_submodel, absmag_submodel, lbol_submodel, mass_submodel, density_submodel, central_pressure_submodel, central_temp_submodel, lifespan_submodel, surf_grav_submodel, grav_bind_submodel, flux_submodel, metallicity_submodel, spectral_class_submodel, lum_class_submodel, peak_wavelength_submodel, star_type_submodel]
 
@@ -339,19 +338,17 @@ def fuseModels(models, name):
    fusion_inputs = models[0][0]
    fusion_outputs = [y[1] for y in models]
    fusion = Model(inputs=fusion_inputs, outputs=fusion_outputs, name=name)
-   loss_list = [DLR(MSLE(), fusion, 0), DLR(MSLE(), fusion, 1), DLR(RMSLE, fusion, 2), DLR(RMSLE, fusion, 3), DLR(MSLE(), fusion, 4), DLR(RMSLE, fusion, 5), DLR(RMSLE, fusion, 6), DLR(MSLE(), fusion, 7), DLR(RMSLE, fusion, 8), DLR(RMSLE, fusion, 9), DLR(RMSLE, fusion, 10), DLR(RMSLE, fusion, 11), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 12), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 13), DLR(RMSLE, fusion, 14), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 15)]
+   loss_list = [DLR(MSLE(), fusion, 0), DLR(MSLE(), fusion, 1), DLR(RMSLE, fusion, 2), DLR(RMSLE, fusion, 3), DLR(MSLE(), fusion, 4), DLR(RMSLE, fusion, 5), DLR(RMSLE, fusion, 6), DLR(MSLE(), fusion, 7), DLR(RMSLE, fusion, 8), DLR(RMSLE, fusion, 9), DLR(RMSLE, fusion, 10), DLR(RMSLE, fusion, 11), DLR(MSLE(), fusion, 12), DLR(MSLE(), fusion, 13), DLR(RMSLE, fusion, 14), DLR(MSLE(), fusion, 15)]
    fusion.compile(optimizer=Adam(learning_rate=0.0001), loss=loss_list, metrics=loss_list, run_eagerly=False, steps_per_execution=1, auto_scale_loss=True)
    return fusion
 
 
 # Train the model and return the trained model and testing data 
 def Fuse():
-   dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv", nrows=5000)
-   prep_func6 = lambda inpVec: to_categorical(inpVec, num_classes=6)
-   prep_func7 = lambda inpVec: to_categorical(inpVec, num_classes=7)
+   dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv", nrows=50000)
    x_cols = ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"]
    y_cols = ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "SpectralClass", "LuminosityClass", "StarPeakWavelength(nm)", "StarType"]
-   x_train, x_test, y_train, y_test = data_prep(dataset, x_cols, y_cols, ["SpectralClass", "LuminosityClass", "StarType"], [prep_func7, prep_func7, prep_func6])
+   x_train, x_test, y_train, y_test = data_prep(dataset, x_cols, y_cols, ["SpectralClass", "LuminosityClass", "StarType"])
    y_train = [np.stack(y_train[l]) for l in list(y_train)]
 
    Fusion = fuseModels(createModels(), name="Fusion")

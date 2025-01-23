@@ -9,15 +9,10 @@ import numpy as np
 import pandas as pd
 
 def get_acc(y, y_hat, i=None):
-    if i is not None:
-        length = len(i)
-        acc = 100 - (100 * ((abs(y - y_hat)) / length))
+    if i:
+        acc = 100 - (100 * ((abs(y - y_hat)) / i))
         return acc
-    try:
-        acc = 100 - (100 * (abs((y-y_hat)/abs(y))))
-    except ZeroDivisionError as e:
-        print(e)
-        acc = 100 - (100 * (abs(((y+0.001)-y_hat)/(abs(y)+0.001))))
+    acc = 100 - (100 * (abs((y-y_hat)/abs(y))))
     return acc
 
 
@@ -47,14 +42,18 @@ for idx, i in enumerate(x_test.values.tolist()):
 
     acc_list = []
     for id, pred in enumerate(prediction):
-        try:
-            y = float(y_test.values.tolist()[idx][id])
-            acc_list.append(get_acc(y, pred))
-        except (ValueError, TypeError):
-            pred2 = np.argmax(pred)
-            y = np.argmax(np.fromstring(y_test.values.tolist()[idx][id].replace("[", "").replace("]", ""), sep=" "))
-            acc_list.append(get_acc(y, pred2, pred))
-        
+        y = float(y_test.values.tolist()[idx][id])
+        if id == 12:
+            acc_list.append(get_acc(y, round(pred[0], 0), i=id))
+            continue
+        elif id == 13:
+            acc_list.append(get_acc(y, round(pred[0], 0), i=id))
+            continue
+        elif id == 15:
+            acc_list.append(get_acc(y, round(pred[0], 0), i=id))
+            continue
+        acc_list.append(get_acc(y, pred))
+            
     accuracy_list.append(acc_list)
     
 
