@@ -2,6 +2,7 @@ venv/
 report/
 src/data/formattedData/
 src/data/unformattedData/
+src/FUSION/TensorBoardDataSummaries/
 src/FUSION/FusionStellaarData_link.txt
 src/FUSION/FusionStellaarData.csv
 .DS_Store
