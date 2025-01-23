@@ -54,7 +54,6 @@ def data_prep(df, inputs, outputs, mod_attrs):
    t_list = [i for i in outputs if i not in mod_attrs]
    robust_scaler = RobustScaler().set_output(transform="pandas").fit(y_train[t_list])
    y_train = robust_scaler.transform(y_train[t_list])
-   y_train = y_train[t_list]
    for v in mod_attrs:
        y_train.insert(outputs.index(v), v, df[v])
    y_train.columns = outputs
@@ -355,7 +354,7 @@ def Fuse():
    Fusion = fuseModels(createModels(), name="Fusion")
    earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=5, baseline=None, mode="min", verbose=2, restore_best_weights=True)
    tensorboard_callback = callbacks.TensorBoard(log_dir="src/FUSION/TensorBoardDataSummaries", update_freq=1000, write_images=True, write_steps_per_second=True, profile_batch=(11, 16))   
-   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=11, batch_size=16, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback, tensorboard_callback], validation_batch_size=8, validation_freq=1)
+   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=21, batch_size=16, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback, tensorboard_callback], validation_batch_size=8, validation_freq=1)
    Fusion.save("src/FUSION/fusionModel.keras")
    pd.DataFrame(x_test, columns=x_cols).to_csv("src/FUSION/testData/x_test.csv")
    pd.DataFrame(y_test, columns=y_cols).to_csv("src/FUSION/testData/y_test.csv")
@@ -363,6 +362,6 @@ def Fuse():
    return Fusion, (x_test, y_test)
 
 
-# To save output to a text file, run this file with '> fusionTraining.txt' ('python fusion.py > fusionTraining.txt')
+# To save output to a text file, run this file with '> src/FUSION/fusionTraining.txt' ('python src/FUSION/fusion.py > src/FUSION/fusionTraining.txt')
 if __name__ == "__main__":
    Fuse()
