@@ -28,7 +28,7 @@ from tensorflow.keras import backend as K
 from tensorflow.keras.saving import register_keras_serializable
 from tensorflow.keras.models import Model
 from tensorflow.keras.constraints import Constraint
-from tensorflow.keras.losses import MeanSquaredLogarithmicError as MSLE, CategoricalCrossentropy as CCE, Loss
+from tensorflow.keras.losses import MeanSquaredLogarithmicError as MSLE, Loss
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.activations import gelu
 from tensorflow.keras.ops import log10, tanh
@@ -54,6 +54,7 @@ def data_prep(df, inputs, outputs, mod_attrs):
    t_list = [i for i in outputs if i not in mod_attrs]
    robust_scaler = RobustScaler().set_output(transform="pandas").fit(y_train[t_list])
    y_train = robust_scaler.transform(y_train[t_list])
+   y_train = y_train[t_list]
    for v in mod_attrs:
        y_train.insert(outputs.index(v), v, df[v])
    y_train.columns = outputs
@@ -260,7 +261,7 @@ def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True,
    else:
        input_layer = gen_inputs
    if embed:
-       embedded = Embedding(input_dim=embed_dim, output_dim=2)(lambda_init(input_layer, embed, no_right=True))
+       embedded = Embedding(input_dim=embed_dim, output_dim=2, embeddings_regularizer="L1L2")(lambda_init(input_layer, embed, no_right=True))
    else:
        embedded = input_layer
    if norm is True:
@@ -345,7 +346,7 @@ def fuseModels(models, name):
 
 # Train the model and return the trained model and testing data 
 def Fuse():
-   dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv", nrows=50000)
+   dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv")
    x_cols = ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"]
    y_cols = ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "SpectralClass", "LuminosityClass", "StarPeakWavelength(nm)", "StarType"]
    x_train, x_test, y_train, y_test = data_prep(dataset, x_cols, y_cols, ["SpectralClass", "LuminosityClass", "StarType"])
