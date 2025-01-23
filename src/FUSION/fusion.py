@@ -114,6 +114,8 @@ class LambdaLayerClass(Layer):
             return log10(inputs ** 4)
         elif self.func == "peak_wl":
             return 1 / inputs
+        else:
+            return inputs
     
     def compute_output_shape(self, input_shape):
         return TensorShape([None, 1])
@@ -250,7 +252,7 @@ def lambda_functors():
 
 
 # Create each output's individual submodel
-def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True, output_neurons=1, output_actv=None):
+def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True, bound=None, output_neurons=1, output_actv=None):
    global gen_inputs
    global submodelCount
 
@@ -262,7 +264,8 @@ def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True,
    if norm is True:
        norm_input = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(input_layer)
    else:
-       norm_input = Discretization(bin_boundaries=norm, output_mode="int", name="disc{}".format(submodelCount))(input_layer)
+       norm_input = Discretization(bin_boundaries=norm, output_mode="int", name="disc{}".format(submodelCount))(lambda_init(input_layer, bound))
+       norm_input = concatenate([norm_input, input_layer])
        norm_input = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(norm_input)
 
    hidden_input = Dense(32, activation=gelu, kernel_regularizer="L1L2", bias_regularizer="L1L2", activity_regularizer="L1L2", name="hidden_input{}".format(submodelCount))(norm_input)
@@ -323,8 +326,8 @@ def createModels():
    grav_bind_submodel = createSubModel(lambda_layer=grav_bind_lam, lambda_inputs=[11, 2])
    flux_submodel = createSubModel(lambda_layer=flux_lam, lambda_inputs=[0])
    metallicity_submodel = createSubModel()
-   spectral_class_submodel = createSubModel(norm=[0., 4000., 5200., 7000., 12000., 20000., 34000., 420000.], output_neurons=7, output_actv=Softmax())
-   lum_class_submodel = createSubModel(norm=[0., 25., 100., 1300., 8000., 125000.], output_neurons=7, output_actv=Softmax())
+   spectral_class_submodel = createSubModel(norm=[0., 4000., 5200., 7000., 12000., 20000., 34000., 420000.], bound=[0], output_neurons=7, output_actv=Softmax())
+   lum_class_submodel = createSubModel(norm=[0., 25., 100., 1300., 8000., 125000.], bound=[1], output_neurons=7, output_actv=Softmax())
    peak_wavelength_submodel = createSubModel(lambda_layer=peak_wavelength_lam, lambda_inputs=[0])
    star_type_submodel = createSubModel(output_neurons=6, output_actv=Softmax())
 
@@ -337,13 +340,13 @@ def fuseModels(models, name):
    fusion_outputs = [y[1] for y in models]
    fusion = Model(inputs=fusion_inputs, outputs=fusion_outputs, name=name)
    loss_list = [DLR(MSLE(), fusion, 0), DLR(MSLE(), fusion, 1), DLR(RMSLE, fusion, 2), DLR(RMSLE, fusion, 3), DLR(MSLE(), fusion, 4), DLR(RMSLE, fusion, 5), DLR(RMSLE, fusion, 6), DLR(MSLE(), fusion, 7), DLR(RMSLE, fusion, 8), DLR(RMSLE, fusion, 9), DLR(RMSLE, fusion, 10), DLR(RMSLE, fusion, 11), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 12), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 13), DLR(RMSLE, fusion, 14), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 15)]
-   fusion.compile(optimizer=Adam(learning_rate=0.001), loss=loss_list, metrics=loss_list, run_eagerly=False, steps_per_execution=1, auto_scale_loss=True)
+   fusion.compile(optimizer=Adam(learning_rate=0.0001), loss=loss_list, metrics=loss_list, run_eagerly=False, steps_per_execution=1, auto_scale_loss=True)
    return fusion
 
 
 # Train the model and return the trained model and testing data 
 def Fuse():
-   dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv")
+   dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv", nrows=5000)
    prep_func6 = lambda inpVec: to_categorical(inpVec, num_classes=6)
    prep_func7 = lambda inpVec: to_categorical(inpVec, num_classes=7)
    x_cols = ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"]
@@ -353,7 +356,8 @@ def Fuse():
 
    Fusion = fuseModels(createModels(), name="Fusion")
    earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=5, baseline=None, mode="min", verbose=2, restore_best_weights=True)
-   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=11, batch_size=64, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback], validation_batch_size=32, validation_freq=1)
+   tensorboard_callback = callbacks.TensorBoard(log_dir="src/FUSION/TensorBoardDataSummaries", update_freq=1000, write_images=True, write_steps_per_second=True, profile_batch=(11, 16))   
+   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=11, batch_size=16, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback, tensorboard_callback], validation_batch_size=8, validation_freq=1)
    Fusion.save("src/FUSION/fusionModel.keras")
    pd.DataFrame(x_test, columns=x_cols).to_csv("src/FUSION/testData/x_test.csv")
    pd.DataFrame(y_test, columns=y_cols).to_csv("src/FUSION/testData/y_test.csv")

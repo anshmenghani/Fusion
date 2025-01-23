@@ -1,4 +1,4 @@
-# Returns Fusion accuracy by test sample 
+# Returns Fusion accuracy and Mean Absolute Percentage Error by test sample 
 
 import sys 
 sys.path.insert(1, "src/FUSION")
@@ -13,17 +13,21 @@ def get_acc(y, y_hat, i=None):
         length = len(i)
         acc = 100 - (100 * ((abs(y - y_hat)) / length))
         return acc
-    acc = 100 - (100 * (abs((y-y_hat)/y)))
+    try:
+        acc = 100 - (100 * (abs((y-y_hat)/abs(y))))
+    except ZeroDivisionError as e:
+        print(e)
+        acc = 100 - (100 * (abs(((y+0.001)-y_hat)/(abs(y)+0.001))))
     return acc
 
 
 cols = ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "StarPeakWavelength(nm)"]
 scaler = joblib.load("src/FUSION/fusionStandard.pkl")
-x_test = pd.read_csv("src/FUSION/testData/x_test.csv", nrows=100)
+x_test = pd.read_csv("src/FUSION/testData/x_test.csv")
 x_test = x_test.iloc[:, 1:]
-y_test = pd.read_csv("src/FUSION/testData/y_test.csv", nrows=100)
+y_test = pd.read_csv("src/FUSION/testData/y_test.csv")
 y_test = y_test.iloc[:, 1:]
-fusion_model = load_model("src/FUSION/fusionModel.keras", custom_objects={"DLR": DLR, "LambdaLayerClass": LambdaLayerClass, "LossRewardOptimizer": LossRewardOptimizer}, safe_mode=False)
+fusion_model = load_model("src/FUSION/fusionModel.keras", custom_objects={"DLR": DLR, "LambdaLayerClass": LambdaLayerClass, "LossRewardOptimizer": LossRewardOptimizer})
 accuracy_list = []
 
 for idx, i in enumerate(x_test.values.tolist()):
@@ -55,4 +59,13 @@ for idx, i in enumerate(x_test.values.tolist()):
     
 
 def get_fusion_acc():
-    return accuracy_list
+    return np.array(accuracy_list)
+
+
+def get_fusion_mapes():
+    accs = get_fusion_acc()
+    mapes = np.array([[100-i for i in x] for x in accs])
+    return mapes
+
+
+print(np.mean(get_fusion_acc(), axis=0).tolist(), np.mean(get_fusion_mapes(), axis=0).tolist(), sep="\n\n")
