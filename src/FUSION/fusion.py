@@ -23,7 +23,7 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 import joblib
-from tensorflow.keras.layers import Layer, Input, Embedding, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, PReLU, Cropping1D, Reshape
+from tensorflow.keras.layers import Layer, Input, Embedding, Flatten, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, PReLU, Cropping1D, Reshape
 from tensorflow.keras import backend as K
 from tensorflow.keras.saving import register_keras_serializable
 from tensorflow.keras.models import Model
@@ -260,14 +260,15 @@ def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True,
    else:
        input_layer = gen_inputs
    if embed:
-       embedded = Embedding(input_dim=embed_dim, output_dim=2, embeddings_regularizer="L1L2")(lambda_init(input_layer, embed, no_right=True))
+       embedded = Embedding(input_dim=embed_dim, output_dim=2, embeddings_regularizer="L1L2", name="Embedding{}".format(submodelCount))(lambda_init(input_layer, embed, no_right=True))
+       embedded = Flatten(name="Flatten{}".format(submodelCount))(embedded)
    else:
        embedded = input_layer
    if norm is True:
        norm_input = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(embedded)
    else:
        norm_input = Discretization(bin_boundaries=norm, output_mode="int", name="disc{}".format(submodelCount))(lambda_init(input_layer, bound))
-       norm_input = concatenate([embedded, Reshape((1, 1))(norm_input)])
+       norm_input = concatenate([embedded, norm_input])
        norm_input = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(norm_input)
 
    hidden_input = Dense(32, activation=gelu, kernel_regularizer="L1L2", bias_regularizer="L1L2", activity_regularizer="L1L2", name="hidden_input{}".format(submodelCount))(norm_input)
@@ -302,7 +303,6 @@ def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True,
 
    output = Dense(output_neurons, name="output_layer{}".format(submodelCount))(hidden3)
    lro_layer = LossRewardOptimizer(name="lroLayer{}".format(submodelCount))(output)
-   lro_layer = Reshape((1,))(lro_layer)
    gen_inputs = concatenate([gen_inputs, lro_layer], name="upd_inputs_with_new_output{}".format(submodelCount))
    submodelCount += 1
 
@@ -354,7 +354,7 @@ def Fuse():
    Fusion = fuseModels(createModels(), name="Fusion")
    earlyStoppingCallback = callbacks.EarlyStopping(monitor="val_loss", min_delta=0, patience=5, baseline=None, mode="min", verbose=2, restore_best_weights=True)
    tensorboard_callback = callbacks.TensorBoard(log_dir="src/FUSION/TensorBoardDataSummaries", update_freq=1000, write_images=True, write_steps_per_second=True, profile_batch=(11, 16))   
-   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=43, batch_size=128, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback, tensorboard_callback], validation_batch_size=32, validation_freq=1)
+   Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=6, batch_size=128, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback, tensorboard_callback], validation_batch_size=32, validation_freq=1)
    Fusion.save("src/FUSION/fusionModel.keras")
    pd.DataFrame(x_test, columns=x_cols).to_csv("src/FUSION/testData/x_test.csv")
    pd.DataFrame(y_test, columns=y_cols).to_csv("src/FUSION/testData/y_test.csv")
