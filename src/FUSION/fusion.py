@@ -29,7 +29,7 @@ from tensorflow.keras import backend as K
 from tensorflow.keras.saving import register_keras_serializable
 from tensorflow.keras.models import Model
 from tensorflow.keras.constraints import Constraint
-from tensorflow.keras.losses import MeanSquaredLogarithmicError as MSLE, CategoricalCrossentropy as CCE, Loss
+from tensorflow.keras.losses import MeanSquaredLogarithmicError as MSLE, MeanAbsoluteError as MAE, CategoricalCrossentropy as CCE, Loss
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.activations import gelu
 from tensorflow.keras.ops import log10, tanh
@@ -350,7 +350,7 @@ def fuseModels(models, name):
    fusion_inputs = models[0][0]
    fusion_outputs = [y[1] for y in models]
    fusion = Model(inputs=fusion_inputs, outputs=fusion_outputs, name=name)
-   loss_list = [DLR(MSLE(), fusion, 0), DLR(MSLE(), fusion, 1), DLR(RMSLE, fusion, 2), DLR(RMSLE, fusion, 3), DLR(MSLE(), fusion, 4), DLR(RMSLE, fusion, 5), DLR(RMSLE, fusion, 6), DLR(MSLE(), fusion, 7), DLR(RMSLE, fusion, 8), DLR(RMSLE, fusion, 9), DLR(RMSLE, fusion, 10), DLR(RMSLE, fusion, 11), DLR(MSLE(), fusion, 12), DLR(MSLE(), fusion, 13), DLR(RMSLE, fusion, 14), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 15)]
+   loss_list = [DLR(MSLE(), fusion, 0), DLR(MSLE(), fusion, 1), DLR(RMSLE, fusion, 2), DLR(RMSLE, fusion, 3), DLR(MSLE(), fusion, 4), DLR(RMSLE, fusion, 5), DLR(RMSLE, fusion, 6), DLR(MSLE(), fusion, 7), DLR(RMSLE, fusion, 8), DLR(RMSLE, fusion, 9), DLR(RMSLE, fusion, 10), DLR(MAE(), fusion, 11), DLR(MSLE(), fusion, 12), DLR(MSLE(), fusion, 13), DLR(RMSLE, fusion, 14), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 15)]
    fusion.compile(optimizer=Adam(learning_rate=0.0001), loss=loss_list, metrics=loss_list, run_eagerly=False, steps_per_execution=1, auto_scale_loss=True)
    return fusion
 
