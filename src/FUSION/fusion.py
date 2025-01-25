@@ -375,3 +375,4 @@ def Fuse():
 # To save output to a text file, run this file with '> src/FUSION/fusionTraining.txt' ('python src/FUSION/fusion.py > src/FUSION/fusionTraining.txt')
 if __name__ == "__main__":
    Fuse()
+    
