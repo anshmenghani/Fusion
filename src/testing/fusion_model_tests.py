@@ -21,9 +21,9 @@ def get_acc(y, y_hat, i=None):
 
 cols = ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "StarPeakWavelength(nm)"]
 scaler = joblib.load("src/FUSION/fusionStandard.pkl")
-x_test = pd.read_csv("src/FUSION/testData/x_test.csv", nrows=100)
+x_test = pd.read_csv("src/FUSION/testData/x_test.csv", nrows=10000)
 x_test = x_test.iloc[:, 1:]
-y_test = pd.read_csv("src/FUSION/testData/y_test.csv", nrows=100)
+y_test = pd.read_csv("src/FUSION/testData/y_test.csv", nrows=10000)
 y_test = y_test.iloc[:, 1:]
 fusion_model = load_model("src/FUSION/fusionModel.keras", custom_objects={"DLR": DLR, "LambdaLayerClass": LambdaLayerClass, "LossRewardOptimizer": LossRewardOptimizer})
 accuracy_list = []
@@ -49,10 +49,10 @@ for idx, i in enumerate(x_test.values.tolist()):
     for id, pred in enumerate(prediction):
         y = float(y_test.values.tolist()[idx][id])
         if id == 12:
-            acc_list.append(get_acc(y, round(pred[0], 0), i=id))
+            acc_list.append(get_acc(y, np.argmax(pred), i=id))
             continue
         elif id == 13:
-            acc_list.append(get_acc(y, round(pred[0], 0), i=id))
+            acc_list.append(get_acc(y, np.argmax(pred), i=id))
             continue
         elif id == 15:
             acc_list.append(get_acc(y, np.argmax(pred), i=id))
@@ -76,7 +76,7 @@ def get_fusion_mapes():
 
 acc_list = get_fusion_acc()
 col_list = []
-for i in range(len((acc_list))):
+for i in range(acc_list.shape[1]):
     cleaned = acc_list[:, i][acc_list[:, i] != None]
     col_list.append(cleaned)
     print(np.mean(cleaned))
