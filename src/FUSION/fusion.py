@@ -23,12 +23,13 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 import joblib
-from tensorflow.keras.layers import Layer, Input, Embedding, Flatten, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, PReLU, Cropping1D, Reshape
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.layers import Layer, Input, Embedding, Flatten, LayerNormalization, Discretization, Dense, GaussianDropout, concatenate, PReLU, Softmax, Cropping1D, Reshape
 from tensorflow.keras import backend as K
 from tensorflow.keras.saving import register_keras_serializable
 from tensorflow.keras.models import Model
 from tensorflow.keras.constraints import Constraint
-from tensorflow.keras.losses import MeanSquaredLogarithmicError as MSLE, Loss
+from tensorflow.keras.losses import MeanSquaredLogarithmicError as MSLE, CategoricalCrossentropy as CCE, Loss
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.activations import gelu
 from tensorflow.keras.ops import log10, tanh
@@ -44,7 +45,7 @@ curr_val_loss = Variable(1, dtype=float32)
 
 
 # Prepare training and testing data from dataframe
-def data_prep(df, inputs, outputs, mod_attrs):
+def data_prep(df, inputs, outputs, mod_attrs, func_attrs, funcs):
    df = shuffle(df)   
    x = df[inputs].iloc[:, :]
    y = df[outputs].iloc[:, :]
@@ -55,10 +56,17 @@ def data_prep(df, inputs, outputs, mod_attrs):
    robust_scaler = RobustScaler().set_output(transform="pandas").fit(y_train[t_list])
    y_train = robust_scaler.transform(y_train[t_list])
    for v in mod_attrs:
-       y_train.insert(outputs.index(v), v, df[v])
+      y_train.insert(outputs.index(v), v, df[v])
    y_train.columns = outputs
    joblib.dump(robust_scaler, "src/FUSION/fusionStandard.pkl")
    
+   pd.DataFrame(x_test, columns=inputs).to_csv("src/FUSION/testData/x_test.csv")
+   pd.DataFrame(y_test, columns=outputs).to_csv("src/FUSION/testData/y_test.csv")
+
+   for idx, m in enumerate(func_attrs):
+      modded = y_train[m].apply(funcs[idx])
+      y_train[m] = modded
+
    return x_train, x_test, y_train, y_test
 
 
@@ -250,7 +258,7 @@ def lambda_functors():
 
 
 # Create each output's individual submodel
-def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True, bound=None, embed=False, embed_dim=None, output_neurons=1):
+def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True, bound=None, embed=False, embed_dim=None, output_actv=None, output_neurons=1):
    global gen_inputs
    global submodelCount
 
@@ -302,6 +310,10 @@ def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True,
    hidden3 = PReLU()(hidden3)
 
    output = Dense(output_neurons, name="output_layer{}".format(submodelCount))(hidden3)
+   if output_actv is not None:
+      output = output_actv(output)
+      output.name += str(submodelCount)
+
    lro_layer = LossRewardOptimizer(name="lroLayer{}".format(submodelCount))(output)
    gen_inputs = concatenate([gen_inputs, lro_layer], name="upd_inputs_with_new_output{}".format(submodelCount))
    submodelCount += 1
@@ -328,7 +340,7 @@ def createModels():
    spectral_class_submodel = createSubModel(norm=[0., 4000., 5200., 7000., 12000., 20000., 34000., 420000.], bound=[0], embed=[20], embed_dim=7)
    lum_class_submodel = createSubModel(norm=[0., 25., 100., 1300., 8000., 125000.], bound=[1], embed=[21], embed_dim=7)
    peak_wavelength_submodel = createSubModel(lambda_layer=peak_wavelength_lam, lambda_inputs=[0])
-   star_type_submodel = createSubModel(embed=[23], embed_dim=6)
+   star_type_submodel = createSubModel(output_neurons=6, output_actv=Softmax())
 
    return [mbol_submodel, absmag_submodel, lbol_submodel, mass_submodel, density_submodel, central_pressure_submodel, central_temp_submodel, lifespan_submodel, surf_grav_submodel, grav_bind_submodel, flux_submodel, metallicity_submodel, spectral_class_submodel, lum_class_submodel, peak_wavelength_submodel, star_type_submodel]
 
@@ -338,7 +350,7 @@ def fuseModels(models, name):
    fusion_inputs = models[0][0]
    fusion_outputs = [y[1] for y in models]
    fusion = Model(inputs=fusion_inputs, outputs=fusion_outputs, name=name)
-   loss_list = [DLR(MSLE(), fusion, 0), DLR(MSLE(), fusion, 1), DLR(RMSLE, fusion, 2), DLR(RMSLE, fusion, 3), DLR(MSLE(), fusion, 4), DLR(RMSLE, fusion, 5), DLR(RMSLE, fusion, 6), DLR(MSLE(), fusion, 7), DLR(RMSLE, fusion, 8), DLR(RMSLE, fusion, 9), DLR(RMSLE, fusion, 10), DLR(RMSLE, fusion, 11), DLR(MSLE(), fusion, 12), DLR(MSLE(), fusion, 13), DLR(RMSLE, fusion, 14), DLR(MSLE(), fusion, 15)]
+   loss_list = [DLR(MSLE(), fusion, 0), DLR(MSLE(), fusion, 1), DLR(RMSLE, fusion, 2), DLR(RMSLE, fusion, 3), DLR(MSLE(), fusion, 4), DLR(RMSLE, fusion, 5), DLR(RMSLE, fusion, 6), DLR(MSLE(), fusion, 7), DLR(RMSLE, fusion, 8), DLR(RMSLE, fusion, 9), DLR(RMSLE, fusion, 10), DLR(RMSLE, fusion, 11), DLR(MSLE(), fusion, 12), DLR(MSLE(), fusion, 13), DLR(RMSLE, fusion, 14), DLR(CCE(from_logits=False, reduction="sum_over_batch_size"), fusion, 15)]
    fusion.compile(optimizer=Adam(learning_rate=0.0001), loss=loss_list, metrics=loss_list, run_eagerly=False, steps_per_execution=1, auto_scale_loss=True)
    return fusion
 
@@ -348,7 +360,7 @@ def Fuse():
    dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv")
    x_cols = ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"]
    y_cols = ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "SpectralClass", "LuminosityClass", "StarPeakWavelength(nm)", "StarType"]
-   x_train, x_test, y_train, y_test = data_prep(dataset, x_cols, y_cols, ["SpectralClass", "LuminosityClass", "StarType"])
+   x_train, x_test, y_train, y_test = data_prep(dataset, x_cols, y_cols, ["SpectralClass", "LuminosityClass", "StarType"], ["StarType"], [lambda inpVec: to_categorical(inpVec, num_classes=6)])
    y_train = [np.stack(y_train[l]) for l in list(y_train)]
 
    Fusion = fuseModels(createModels(), name="Fusion")
@@ -356,8 +368,6 @@ def Fuse():
    tensorboard_callback = callbacks.TensorBoard(log_dir="src/FUSION/TensorBoardDataSummaries", update_freq=1000, write_images=True, write_steps_per_second=True, profile_batch=(11, 16))   
    Fusion.fit(x=x_train, y=y_train, validation_split=0.185, epochs=6, batch_size=128, shuffle=True, verbose=1, callbacks=[UpdateHistory(), callbacks.TerminateOnNaN(), earlyStoppingCallback, tensorboard_callback], validation_batch_size=32, validation_freq=1)
    Fusion.save("src/FUSION/fusionModel.keras")
-   pd.DataFrame(x_test, columns=x_cols).to_csv("src/FUSION/testData/x_test.csv")
-   pd.DataFrame(y_test, columns=y_cols).to_csv("src/FUSION/testData/y_test.csv")
 
    return Fusion, (x_test, y_test)
 

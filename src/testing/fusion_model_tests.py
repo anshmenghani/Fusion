@@ -12,7 +12,10 @@ def get_acc(y, y_hat, i=None):
     if i:
         acc = 100 - (100 * ((abs(y - y_hat)) / i))
         return acc
-    acc = 100 - (100 * (abs((y-y_hat)/abs(y))))
+    try:
+        acc = 100 - (100 * (abs((y-y_hat)/abs(y))))
+    except ZeroDivisionError:
+        acc = False
     return acc
 
 
@@ -52,7 +55,7 @@ for idx, i in enumerate(x_test.values.tolist()):
             acc_list.append(get_acc(y, round(pred[0], 0), i=id))
             continue
         elif id == 15:
-            acc_list.append(get_acc(y, round(pred[0], 0), i=id))
+            acc_list.append(get_acc(y, np.argmax(pred), i=id))
             continue
         acc_list.append(get_acc(y, pred))
             
@@ -69,3 +72,11 @@ def get_fusion_mapes():
     accs = get_fusion_acc()
     mapes = np.array([[100-i for i in x] for x in accs])
     return mapes
+
+
+acc_list = get_fusion_acc()
+col_list = []
+for i in range(len((acc_list))):
+    cleaned = acc_list[:, i][acc_list[:, i] != None]
+    col_list.append(cleaned)
+    print(np.mean(cleaned))
