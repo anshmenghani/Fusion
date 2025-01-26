@@ -276,7 +276,8 @@ def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True,
        norm_input = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(embedded)
    else:
        norm_input = Discretization(bin_boundaries=norm, output_mode="int", name="disc{}".format(submodelCount))(lambda_init(input_layer, bound))
-       norm_input = concatenate([embedded, norm_input])
+       if embed:
+          norm_input = concatenate([embedded, norm_input])
        norm_input = LayerNormalization(beta_regularizer="L1L2", gamma_regularizer="L1L2")(norm_input)
 
    hidden_input = Dense(32, activation=gelu, kernel_regularizer="L1L2", bias_regularizer="L1L2", activity_regularizer="L1L2", name="hidden_input{}".format(submodelCount))(norm_input)
@@ -357,7 +358,7 @@ def fuseModels(models, name):
 
 # Train the model and return the trained model and testing data 
 def Fuse():
-   dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv")
+   dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv", nrows=1000000)
    x_cols = ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"]
    y_cols = ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "SpectralClass", "LuminosityClass", "StarPeakWavelength(nm)", "StarType"]
    x_train, x_test, y_train, y_test = data_prep(dataset, x_cols, y_cols, ["SpectralClass", "LuminosityClass", "StarType"], ["StarType"], [lambda inpVec: to_categorical(inpVec, num_classes=6)])
@@ -375,4 +376,3 @@ def Fuse():
 # To save output to a text file, run this file with '> src/FUSION/fusionTraining.txt' ('python src/FUSION/fusion.py > src/FUSION/fusionTraining.txt')
 if __name__ == "__main__":
    Fuse()
-    
