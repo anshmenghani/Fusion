@@ -358,7 +358,7 @@ def fuseModels(models, name):
 
 # Train the model and return the trained model and testing data 
 def Fuse():
-   dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv", nrows=1000000)
+   dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv")
    x_cols = ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"]
    y_cols = ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "SpectralClass", "LuminosityClass", "StarPeakWavelength(nm)", "StarType"]
    x_train, x_test, y_train, y_test = data_prep(dataset, x_cols, y_cols, ["SpectralClass", "LuminosityClass", "StarType"], ["StarType"], [lambda inpVec: to_categorical(inpVec, num_classes=6)])
