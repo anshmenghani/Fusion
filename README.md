@@ -43,13 +43,13 @@ The target stars:
 - Gravitational Binding Energy (log(J)) (regression)
 - Bolometric Flux (log(W/m^2)) (regression)
 - Metallicity (log(MH/MHo)) (regression)
-- Spectral Class (classification) 
-- Luminosity Class (classification)
+- Spectral Class (classification) (class M, K, G, F, A, B, or O) 
+- Luminosity Class (classification) (class D, V, IV, III, II, Ib, or Ia)
 - Star Peak Wavelength (nm) (regression)
-- Star Type (classification)
+- Star Type (classification) (class Brown Dwarf, Red Dwarf, White Dwarf, Main Sequence, Supergiant, or Hypergiant)
 #### Outputs calculated outside the model but based on model predictions 
 - Bolometric Correction (based on the predicted bolometric and absolute magnitude values) 
-- Stellar Classification (based on the predicted Spectral and Luminosity classes)
+- Stellar Classification (based on the predicted Spectral and Luminosity classes. For example, the Sun is a G2V star—the '2' is a subclass (from 0–9, where 0 is the hottest sublass and 9 is the coolest) of the 'G' spectral class, and the 'V' is the star's luminosity class)
 
 The model uses a TensorFlow/Keras backend with custom functions tailored to the specific regression and classification problems described above as well as overall model improvement. 
 
