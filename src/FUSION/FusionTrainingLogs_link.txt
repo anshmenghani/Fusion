@@ -1,2 +1,2 @@
-Here is the Google Drive link to the training logs when training the Fusion Stellaar Model: 
-https://drive.google.com/file/d/1w3yPoXl9RQ_AXdU-kYpJttFDa5aSjaZl/view?usp=sharing
+Here is the Google Drive link to the training logs recorded when training the Fusion Stellaar Model: 
+https://drive.google.com/drive/folders/1ogRr8YkcYjcC9qEOaAOI1mKYwdmIZ1Rp?usp=sharing
