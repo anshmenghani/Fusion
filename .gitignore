@@ -1,6 +1,7 @@
 venv/
 **/__pycache__/
 src/FUSION/TensorBoardDataSummaries/
+*.pyc
 src/FUSION/fusionTraining.txt
 src/FUSION/FusionStellaarData.csv
 src/FUSION_aux
