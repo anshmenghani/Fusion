@@ -1,2 +1,2 @@
 Files in this directory include the first ~5000 lines of TESTING data. GitHub does not allow the full file uploads; 
-all of the data can be found on a Google Drive link in the src/FUSION/ directory under a file called FusionStellaarData_link.txt.
+all of the data can be found on a Google Drive link in the src/FUSION/ directory under a file called `FusionStellaarData_link.txt`
