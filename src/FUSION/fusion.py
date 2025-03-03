@@ -44,8 +44,8 @@ prev_val_loss = Variable(0, dtype=float32)
 curr_val_loss = Variable(1, dtype=float32)
 
 
-# Prepare training and testing data from dataframe
 def data_prep(df, inputs, outputs, mod_attrs, func_attrs, funcs):
+   """Prepare training and testing data from dataframe"""
    df = shuffle(df)   
    x = df[inputs].iloc[:, :]
    y = df[outputs].iloc[:, :]
@@ -70,8 +70,8 @@ def data_prep(df, inputs, outputs, mod_attrs, func_attrs, funcs):
    return x_train, x_test, y_train, y_test
 
 
-# Updates the validation loss records in the model's callback history
 class UpdateHistory(callbacks.Callback):
+    """Updates the validation loss records in the model's callback history"""
     def __init__(self):
         super(UpdateHistory, self).__init__()
 
@@ -85,9 +85,9 @@ class UpdateHistory(callbacks.Callback):
             pass
 
 
-# Allow the compatibility of lambda layers with saving the model
 @register_keras_serializable()
 class LambdaLayerClass(Layer):
+    """Allow the compatibility of lambda layers with saving the model"""
     def __init__(self, func, name, **kwargs):
         super(LambdaLayerClass, self).__init__(**kwargs)
         self.name = name
@@ -138,8 +138,8 @@ class LambdaLayerClass(Layer):
         return cls(name=name, func=func)
 
 
-# Slice layers for desired inputs 
 def lambda_init(in_layer, indices, no_right=False):
+   """Slice layers for desired inputs """
    in_shape = in_layer.shape[1]
    inter1 = Reshape((in_shape, 1))(in_layer)
    
@@ -160,15 +160,15 @@ def lambda_init(in_layer, indices, no_right=False):
    return reshaped_lambda_list[0]
 
 
-# Constrains the validation loss reward ratio weight to a reasonable size
 class ValLossRewardConstraint(Constraint):
+    """Constrains the validation loss reward ratio weight to a reasonable size"""
     def __call__(self, weights):
         return clip_by_value(weights, 0.001, 3)
 
 
-# Trains a weight to reward the model for improvments in validation loss
 @register_keras_serializable()
 class LossRewardOptimizer(Layer):
+    """Trains a weight to reward the model for improvments in validation loss"""
     def __init__(self, name, **kwargs):
         super(LossRewardOptimizer, self).__init__(**kwargs)
         self.name = name
@@ -200,15 +200,15 @@ class LossRewardOptimizer(Layer):
         return cls(name=config["name"])
 
 
-# Square Root Mean Squared Logarithmic Error
 def RMSLE(y_true, y_pred):
+   """Square Root Mean Squared Logarithmic Error"""
    mean_squared_logarithmic_error = MSLE()
    return K.sqrt(mean_squared_logarithmic_error(y_true, y_pred))
 
 
-# Custom loss to factor in validation loss reward 
 @register_keras_serializable()
 class DLR(Loss):
+    """Custom loss to factor in validation loss reward"""
     def __init__(self, init_loss_func, model, count, **kwargs):
         super(DLR, self).__init__(**kwargs)
         self.init_loss_func = init_loss_func
@@ -241,8 +241,8 @@ class DLR(Loss):
         return cls(init_loss_func=init_loss_func, model=model, count=count)
 
 
-# Define the lambda layers of the model
 def lambda_functors():
+   """Define the lambda layers of the model"""
    mbol_lam = LambdaLayerClass(name="llcLayer0", func="mbol")
    lbol_lam = LambdaLayerClass(name="llcLayer1", func="lbol") 
    mass_lam = LambdaLayerClass(name="llcLayer2", func="mass")
@@ -257,8 +257,8 @@ def lambda_functors():
    return mbol_lam, lbol_lam, mass_lam, density_lam, central_pressure_lam, central_temp_lam, lifespan_lam, grav_bind_lam, flux_lam, peak_wavelength_lam
 
 
-# Create each output's individual submodel
 def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True, bound=None, embed=False, embed_dim=None, output_actv=None, output_neurons=1):
+   """Create each output's individual submodel"""
    global gen_inputs
    global submodelCount
 
@@ -322,8 +322,8 @@ def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True,
    return [input_layer, lro_layer]
 
 
-# Consolidate all submodels with submodel-specific parameters
 def createModels():
+   """Consolidate all submodels with submodel-specific parameters"""
    mbol_lam, lbol_lam, mass_lam, density_lam, central_pressure_lam, central_temp_lam, lifespan_lam, grav_bind_lam, flux_lam, peak_wavelength_lam = lambda_functors()
 
    mbol_submodel = createSubModel(shape=8, lambda_layer=mbol_lam, lambda_inputs=[1])
@@ -346,8 +346,8 @@ def createModels():
    return [mbol_submodel, absmag_submodel, lbol_submodel, mass_submodel, density_submodel, central_pressure_submodel, central_temp_submodel, lifespan_submodel, surf_grav_submodel, grav_bind_submodel, flux_submodel, metallicity_submodel, spectral_class_submodel, lum_class_submodel, peak_wavelength_submodel, star_type_submodel]
 
 
-# Compile the final model 
 def fuseModels(models, name):
+   """Compile the final model"""
    fusion_inputs = models[0][0]
    fusion_outputs = [y[1] for y in models]
    fusion = Model(inputs=fusion_inputs, outputs=fusion_outputs, name=name)
@@ -356,8 +356,8 @@ def fuseModels(models, name):
    return fusion
 
 
-# Train the model and return the trained model and testing data 
 def Fuse():
+   """Train the model and return the trained model and testing data """
    dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv")
    x_cols = ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"]
    y_cols = ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "SpectralClass", "LuminosityClass", "StarPeakWavelength(nm)", "StarType"]
