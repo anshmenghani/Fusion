@@ -4,3 +4,4 @@ src/FUSION/fusionTraining.txt
 src/FUSION/FusionStellaarData.csv
 src/FUSION_aux
 .DS_Store
+*.pyc
