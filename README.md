@@ -54,4 +54,7 @@ The target stars:
 The model uses a TensorFlow/Keras backend with custom functions tailored to the specific regression and classification problems described above as well as overall model improvement. 
 
 ## Usage
+### Install the application
+### Clone the repository
+###### hi
 #### Once the paper is finished I will start working on deployment and usage instructions for the general public 
