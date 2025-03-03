@@ -170,3 +170,5 @@ df.insert(25, "LuminosityClass_aux", [v[0] for v in lum_class(df["Luminosity(L/L
 df.insert(26, "SpectralClass_aux", [v[0] for v in spec_class(df["EffectiveTemperature(Teff)(K)"])])
 df.insert(25, "StellarClassification", s_classif(df["SpectralClass_aux"], df["LuminosityClass_aux"]))
 df.to_csv("FusionStellaarData.csv", index=False)
+
+# add star type aux! 

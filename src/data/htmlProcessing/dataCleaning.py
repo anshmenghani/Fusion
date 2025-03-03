@@ -3393,6 +3393,6 @@ text = '''
 
 data_links = ""
 for idx, i in enumerate(text.splitlines()):
-    if idx > 1204 and idx < 2206:
+    if idx < 2206:
         data_links += "\nhttp://cdn.gea.esac.esa.int/Gaia/gdr3/Astrophysical_parameters/astrophysical_parameters_supp/" + i.split("04-May")[0].replace('<a href=', "").replace("</a>", "").replace('"', '').split(">")[0]
 pyperclip.copy(data_links)
