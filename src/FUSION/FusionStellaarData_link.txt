@@ -1,2 +1,2 @@
-Here is the Google Drive link to the data used for training, validation, and testing of the Fusion Stellaar Model:
+Here is the Google Drive link to the data used for training, validation, and testing of the Fusion Stellaar Model (goes in this directory):
 https://drive.google.com/drive/folders/14SU8cIke_7OpsDO1CdxNQLSgq0p6Nu-W?usp=sharing
