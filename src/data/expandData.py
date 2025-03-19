@@ -123,19 +123,19 @@ def spec_class(teff):
     teff_list = teff.to_list()
     def get_sc(t):
         if t < 4000:
-            return ["M" + str(int(np.floor((t - 2400) / 160))), 0]
+            return ["M" + str(int(np.floor((t - 4000) / 160))), 0]
         elif t < 5200:
-            return ["K" + str(int(np.floor((t - 4000) / 120))), 1]
+            return ["K" + str(int(np.floor((t - 5200) / 120))), 1]
         elif t < 7000:
-            return ["G" + str(int(np.floor((t - 5200) / 200))), 2]
+            return ["G" + str(int(np.floor((t - 7000) / 200))), 2]
         elif t < 12000:
-            return ["F" + str(int(np.floor((t - 7000) / 500))), 3]
+            return ["F" + str(int(np.floor((t - 12000) / 500))), 3]
         elif t < 20000:
-            return ["A" + str(int(np.floor((t - 12000) / 800))), 4]
+            return ["A" + str(int(np.floor((t - 20000) / 800))), 4]
         elif t < 34000:
-            return ["B" + str(int(np.floor((t - 20000) / 1400))), 5]
+            return ["B" + str(int(np.floor((t - 34000) / 1400))), 5]
         elif t <= 420000:
-            return ["O" + str(int(np.floor((t - 34000) / 76000))), 6]
+            return ["O" + str(int(np.floor((t - 100000) / 7600))), 6]
     sc_list = [get_sc(teff_list[i]) for i in range(len(teff_list))]
     return sc_list
 

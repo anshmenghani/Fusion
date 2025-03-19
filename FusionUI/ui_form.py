@@ -8,6 +8,7 @@
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
 
+import os 
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
     QMetaObject, QObject, QPoint, QRect,
     QSize, QTime, QUrl, Qt)
@@ -15,13 +16,14 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QFrame, QLabel, QLineEdit,
+from PySide6.QtWidgets import (QApplication, QFileDialog, QFrame, QLabel, QLineEdit,
     QProgressBar, QPushButton, QSizePolicy, QStackedWidget,
     QWidget)
 import numpy as np
 import sys 
 sys.path.append('/Users/anshmenghani/Documents/GitHub/Fusion/src/FUSION')
 import prediction
+import webbrowser
     
 class Ui_Fusion(object):
     def set_vars(self):
@@ -48,8 +50,66 @@ class Ui_Fusion(object):
             self.error = "Enter At Least Two Valid Numbers"
 
         return float(teff), float(lum), float(rad)
-            
+
+    def min_max(self, num):
+        if num > 9:
+            return 9
+        elif num < 0:
+            return 0
+        else:
+            return num
+        
+    def get_spec_class(self, c, t):
+        c = int(c)
+        if c == 0:
+            return "M" + str(self.min_max(int(np.floor((t - 4000) / 160))))
+        elif c == 1:
+            return "K" + str(self.min_max(int(np.floor((t - 5200) / 120))))
+        elif c == 2:
+            return "G" + str(self.min_max(int(np.floor((t - 7000) / 200))))
+        elif c == 3:
+            return "F" + str(self.min_max(int(np.floor((t - 12000) / 500))))
+        elif c == 4:
+            return "A" + str(self.min_max(int(np.floor((t - 20000) / 800))))
+        elif c == 5:
+            return "B" + str(self.min_max(int(np.floor((t - 34000) / 1400))))
+        elif c == 6:
+            return "O" + str(self.min_max(int(np.floor((t - 100000) / 7600))))
+        
+    def get_lum_class(self, l):
+        l = int(l)
+        if l == 0:
+            return "D"
+        elif l == 6:
+            return "V"
+        elif l == 5:
+            return "IV"
+        elif l == 4:
+            return "III"
+        elif l == 3:
+            return "II"
+        elif l == 2:
+            return "Ib"
+        elif l == 1:
+            return "Ia"
+        
+    def get_star_type(self, t):
+        t = int(t)
+        if t == 0:
+            return "Brown Dwarf"
+        elif t == 1:
+            return "Red Dwarf"
+        elif t == 2:
+            return "White Dwarf"
+        elif t == 3:
+            return "Main Sequence"
+        elif t == 4:
+            return "Supergiant"
+        elif t == 5:
+            return "Hypergiant"
+   
     def run_fusion_from_inputs(self):
+        self.progressBar.setValue(5)
         teff = self.lineEdit.text()
         lum = self.lineEdit_2.text()
         rad = self.lineEdit_3.text()
@@ -58,17 +118,47 @@ class Ui_Fusion(object):
 
         teff, lum, rad = self.conversion(teff, lum, rad)       
         self.inputs = np.array([teff, lum, rad, rad, rad**3, rad**2, rad, rad**2])
-
-    def run_fusion(self):
-        self.progressBar.setValue(5)
-        self.run_fusion_from_inputs()
         self.progressBar.setValue(40)
+        self.run_fusion(u=True)
+
+    def run_fusion(self, u=False):
         self.outputs = prediction.model(self.inputs)
         self.progressBar.setValue(80)
-        self.update_output_text()
+        if u:
+            self.update_output_text()
+            self.stackedWidget.setCurrentIndex(1)
         self.progressBar.setValue(100)
+        self.progressBar.setValue(0)
 
-        self.stackedWidget.setCurrentIndex(1)
+    def import_csv(self):
+        file_path, _ = QFileDialog.getOpenFileName()
+        if os.path.exists(file_path) and str(file_path).endswith(".csv"):
+            self.inputs = np.genfromtxt(file_path, delimiter=',', skip_header=1)
+            print(self.inputs.shape)
+            self.run_fusion()
+            self.export_csv()
+        else:
+            self.error = "Invalid File Path or File Type"
+
+    def export_csv(self):
+        file_path, _ = QFileDialog.getSaveFileName()
+        ins = self.inputs.reshape((1, -1))
+        outs = self.outputs.reshape((1, -1))
+        combined = np.hstack((ins, outs), dtype="str")
+        combined = np.insert(combined[0], 10, float(combined[0][9]) - float((combined[0][8])))
+        combined = np.append(combined, np.nan)
+        combined[21] = self.get_spec_class(float(combined[21]), float(combined[0]))
+        combined[22] = self.get_lum_class(float(combined[22]))
+        combined[24] = self.get_star_type(float(combined[24]))
+        combined[25] = str(combined[21]) + str(combined[22])
+        header_vals = "EffectiveTemperature(Teff)(K),Luminosity(L/Lo),Radius(R/Ro),Diameter(D/Do),Volume(V/Vo),SurfaceArea(SA/SAo),GreatCircleCircumference(GCC/GCCo),GreatCircleArea(GCA/GCAo),AbsoluteBolometricMagnitude(Mbol),AbsoluteMagnitude(M)(Mv),BolometricCorrection(BC)(mag),AbsoluteBolometricLuminosity(Lbol)(log(W)),Mass(M/Mo),AverageDensity(D/Do),CentralPressure(log(N/m^2)),CentralTemperature(log(K)),Lifespan(SL/SLo),SurfaceGravity(log(g)...log(N/kg)),GravitationalBindingEnergy(log(J)),BolometricFlux(log(W/m^2)),Metallicity(log(MH/MHo)),SpectralClass,LuminosityClass,StarPeakWavelength(nm),StarType,StellarClassification"
+        if os.path.exists(file_path):
+            np.savetxt(str(file_path) + ".csv", [combined], delimiter=',', header=header_vals, comments='', fmt='%s')
+        else:
+            self.error = "Invalid Specified Path"
+
+    def open_instructions(self):
+        webbrowser.open_new_tab("https://github.com/anshmenghani/Fusion")
 
     def update_output_text(self):
         inputs = [round(i, 3) for i in self.inputs]
@@ -82,15 +172,15 @@ class Ui_Fusion(object):
         self.label_23.setText(QCoreApplication.translate("Fusion", f"Surface Area (SA/SA\u2299): {inputs[5]}", None))
         self.label_27.setText(QCoreApplication.translate("Fusion", f"Absolute Bolometric Magnitude (Mbol): {outputs[0][0]}", None))
         self.label_16.setText(QCoreApplication.translate("Fusion", f"Radius (R/R\u2299): {inputs[2]}", None))
-        self.label_43.setText(QCoreApplication.translate("Fusion", f"Stellar Classification: ", None))
+        self.label_43.setText(QCoreApplication.translate("Fusion", f"Stellar Classification: {str(self.get_spec_class(outputs[0][12], inputs[0])) + str(self.get_lum_class(outputs[0][13]))}", None))
         self.label_38.setText(QCoreApplication.translate("Fusion", f"Surface Gravity (log(g)...log(N/kg)): {outputs[0][8]}", None))
-        self.label_35.setText(QCoreApplication.translate("Fusion", f"Spectral Class: {outputs[0][12]}", None))
+        self.label_35.setText(QCoreApplication.translate("Fusion", f"Spectral Class: {self.get_spec_class(outputs[0][12], inputs[0])}", None))
         self.label_17.setText(QCoreApplication.translate("Fusion", f"Luminosity (L/L\u2299): {inputs[1]}", None))
         self.label_40.setText(QCoreApplication.translate("Fusion", f"Star Peak Wavelength (nm): {outputs[0][14]}", None))
         self.label_31.setText(QCoreApplication.translate("Fusion", f"Central Pressure (log(N/m^2)): {outputs[0][5]}", None))
-        self.label_34.setText(QCoreApplication.translate("Fusion", f"Luminosity class: {outputs[0][13]}", None))
+        self.label_34.setText(QCoreApplication.translate("Fusion", f"Luminosity class: {self.get_lum_class(outputs[0][13])}", None))
         self.label_28.setText(QCoreApplication.translate("Fusion", f"Absolute Magnitude (M)(Mv): {outputs[0][1]}", None))
-        self.label_44.setText(QCoreApplication.translate("Fusion", f"Star Type: {outputs[0][15]}", None))
+        self.label_44.setText(QCoreApplication.translate("Fusion", f"Star Type: {self.get_star_type(outputs[0][15])}", None))
         self.label_39.setText(QCoreApplication.translate("Fusion", f"Bolometric Correction: {round(outputs[0][1]-outputs[0][0], 3)}", None))
         self.label_20.setText(QCoreApplication.translate("Fusion", f"Diameter (D/D\u2299): {inputs[3]}", None))
         self.label_42.setText(QCoreApplication.translate("Fusion", f"Metallicity (MH/MH\u2299): {outputs[0][11]}", None))
@@ -157,6 +247,7 @@ class Ui_Fusion(object):
         self.pushButton_3.setGeometry(QRect(130, 80, 31, 32))
         self.pushButton_3.setStyleSheet(u"color: rgb(221, 251, 210);\n"
 "")
+        self.pushButton_3.clicked.connect(self.open_instructions)
         self.label_3 = QLabel(self.page_3)
         self.label_3.setObjectName(u"label_3")
         self.label_3.setGeometry(QRect(85, 160, 191, 16))
@@ -177,9 +268,10 @@ class Ui_Fusion(object):
         self.pushButton_2 = QPushButton(self.page_3)
         self.pushButton_2.setObjectName(u"pushButton_2")
         self.pushButton_2.setGeometry(QRect(210, 80, 31, 32))
+        self.pushButton_2.clicked.connect(self.import_csv)
         self.model = QPushButton(self.page_3)
         self.model.setObjectName(u"model")
-        self.model.clicked.connect(self.run_fusion)
+        self.model.clicked.connect(self.run_fusion_from_inputs)
         self.model.setGeometry(QRect(175, 287, 100, 32))
         self.model.setStyleSheet(u"color: rgb(107, 127, 215);")
         self.lineEdit = QLineEdit(self.page_3)
@@ -325,6 +417,7 @@ class Ui_Fusion(object):
         self.model_3.setObjectName(u"model_3")
         self.model_3.setGeometry(QRect(280, 530, 100, 32))
         self.model_3.setStyleSheet(u"color: rgb(107, 127, 215);")
+        self.model_3.clicked.connect(self.export_csv)
         self.label_35 = QLabel(self.page_4)
         self.label_35.setObjectName(u"label_35")
         self.label_35.setGeometry(QRect(250, 100, 191, 16))
