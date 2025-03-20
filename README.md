@@ -58,3 +58,4 @@ The model uses a TensorFlow/Keras backend with custom functions tailored to the 
 #### Once the project materials are finished, I will start working on deployment and usage instructions for the general public 
 ### Clone the repository
 #### Please take a look at the license found in this directory under the filename `LICENSE` 
+### Contact Information: 
