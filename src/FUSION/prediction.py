@@ -15,7 +15,8 @@ fusion_model = load_model("/Users/anshmenghani/Documents/GitHub/Fusion/src/FUSIO
 scaler = joblib.load("/Users/anshmenghani/Documents/GitHub/Fusion/src/FUSION/fusionStandard.pkl")
 
 def model(data: np.array) -> np.array:
-    data = data.reshape(1, -1)
+    if data.ndim != 2:
+        data = data.reshape(1, -1)
     predictions = np.empty(shape=(data.shape[0], 16))
     for idx, i in enumerate(data):
         prediction = fusion_model.predict(np.array([i]), verbose=1)

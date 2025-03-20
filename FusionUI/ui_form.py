@@ -8,6 +8,8 @@
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
 
+# PySide6 User Interface for the Fusion Model 
+
 import os 
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
     QMetaObject, QObject, QPoint, QRect,
@@ -122,7 +124,10 @@ class Ui_Fusion(object):
         self.run_fusion(u=True)
 
     def run_fusion(self, u=False):
-        self.outputs = prediction.model(self.inputs)
+        if self.inputs.shape[-1] == 9:
+            self.outputs = prediction.model(self.inputs[:, -8:])
+        else:
+            self.outputs = prediction.model(self.inputs)
         self.progressBar.setValue(80)
         if u:
             self.update_output_text()
@@ -132,33 +137,65 @@ class Ui_Fusion(object):
 
     def import_csv(self):
         file_path, _ = QFileDialog.getOpenFileName()
+        self.progressBar.setValue(15)
         if os.path.exists(file_path) and str(file_path).endswith(".csv"):
             self.inputs = np.genfromtxt(file_path, delimiter=',', skip_header=1)
-            print(self.inputs.shape)
+            self.progressBar.setValue(35)
             self.run_fusion()
+            self.progressBar.setValue(75)
             self.export_csv()
+            self.progressBar.setValue(100)
+            self.progressBar.setValue(0)
         else:
             self.error = "Invalid File Path or File Type"
 
     def export_csv(self):
         file_path, _ = QFileDialog.getSaveFileName()
-        ins = self.inputs.reshape((1, -1))
-        outs = self.outputs.reshape((1, -1))
-        combined = np.hstack((ins, outs), dtype="str")
-        combined = np.insert(combined[0], 10, float(combined[0][9]) - float((combined[0][8])))
-        combined = np.append(combined, np.nan)
-        combined[21] = self.get_spec_class(float(combined[21]), float(combined[0]))
-        combined[22] = self.get_lum_class(float(combined[22]))
-        combined[24] = self.get_star_type(float(combined[24]))
-        combined[25] = str(combined[21]) + str(combined[22])
-        header_vals = "EffectiveTemperature(Teff)(K),Luminosity(L/Lo),Radius(R/Ro),Diameter(D/Do),Volume(V/Vo),SurfaceArea(SA/SAo),GreatCircleCircumference(GCC/GCCo),GreatCircleArea(GCA/GCAo),AbsoluteBolometricMagnitude(Mbol),AbsoluteMagnitude(M)(Mv),BolometricCorrection(BC)(mag),AbsoluteBolometricLuminosity(Lbol)(log(W)),Mass(M/Mo),AverageDensity(D/Do),CentralPressure(log(N/m^2)),CentralTemperature(log(K)),Lifespan(SL/SLo),SurfaceGravity(log(g)...log(N/kg)),GravitationalBindingEnergy(log(J)),BolometricFlux(log(W/m^2)),Metallicity(log(MH/MHo)),SpectralClass,LuminosityClass,StarPeakWavelength(nm),StarType,StellarClassification"
-        if os.path.exists(file_path):
-            np.savetxt(str(file_path) + ".csv", [combined], delimiter=',', header=header_vals, comments='', fmt='%s')
+        if self.inputs.ndim != 2:
+            ins = self.inputs.reshape((1, -1))
+            outs = self.outputs.reshape((1, -1))
+            combined = np.hstack((ins, outs), dtype="str")
+            combined = combined.reshape((1, -1))
+        else:
+            if self.inputs.shape[-1] > 8:
+                combined = np.hstack((self.inputs[:, -8:], self.outputs), dtype="str")
+        bcs = combined[:, 9].astype(np.float32) - combined[:, 8].astype(np.float32)
+        combined = np.insert(combined, 10, bcs.astype(str), axis=1)
+        combined = np.column_stack((combined, [np.nan for _ in combined]))
+        combined[:, 21] = np.vectorize(self.get_spec_class)(combined[:, 21].astype(np.float32), combined[:, 0].astype(np.float32))
+        combined[:, 22] = np.vectorize(self.get_lum_class)(combined[:, 22].astype(np.float32))
+        combined[:, 24] = np.vectorize(self.get_star_type)(combined[:, 24].astype(np.float32))
+        combined[:, 25] = np.char.add(combined[:, 21].astype("str"), combined[:, 22].astype("str"))
+        
+        if self.inputs.shape[-1] > 8:
+            combined = np.insert(combined, 0, self.inputs[:, 0], axis=1)
+        else:
+            combined = np.insert(combined, 0, self.name, axis=1)
+
+        header_vals = ",EffectiveTemperature(Teff)(K),Luminosity(L/Lo),Radius(R/Ro),Diameter(D/Do),Volume(V/Vo),SurfaceArea(SA/SAo),GreatCircleCircumference(GCC/GCCo),GreatCircleArea(GCA/GCAo),AbsoluteBolometricMagnitude(Mbol),AbsoluteMagnitude(M)(Mv),BolometricCorrection(BC)(mag),AbsoluteBolometricLuminosity(Lbol)(log(W)),Mass(M/Mo),AverageDensity(D/Do),CentralPressure(log(N/m^2)),CentralTemperature(log(K)),Lifespan(SL/SLo),SurfaceGravity(log(g)...log(N/kg)),GravitationalBindingEnergy(log(J)),BolometricFlux(log(W/m^2)),Metallicity(log(MH/MHo)),SpectralClass,LuminosityClass,StarPeakWavelength(nm),StarType,StellarClassification"
+        if os.path.exists(os.path.dirname(file_path)):
+            np.savetxt(str(file_path) + ".csv", combined, delimiter=',', header=header_vals, comments='', fmt='%s')
         else:
             self.error = "Invalid Specified Path"
 
     def open_instructions(self):
         webbrowser.open_new_tab("https://github.com/anshmenghani/Fusion")
+
+    def get_image(self, st):
+        # add example label
+        if st == "Brown Dwarf":
+            return "/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/star_examples/brown-dwarf.png"
+        elif st == "Red Dwarf":
+            return "/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/star_examples/red-dwarf.png"
+        elif st == "White Dwarf":
+            return "/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/star_examples/white-dwarf.png"
+        elif st == "Main Sequence":
+            return "/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/star_examples/main-sequence.png"
+        elif st == "Supergiant":
+            return "/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/star_examples/supergiant.png"
+        elif st == "Hypergiant":
+            return "/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/star_examples/hypergiant.png"
+
 
     def update_output_text(self):
         inputs = [round(i, 3) for i in self.inputs]
@@ -190,7 +227,9 @@ class Ui_Fusion(object):
         self.label_37.setText(QCoreApplication.translate("Fusion", f"Bolometric Flux (log(W/m^2)): {outputs[0][10]}", None))
         self.label_36.setText(QCoreApplication.translate("Fusion", f"Lifespan (SL/SL\u2299): {outputs[0][7]}", None))
         self.label_45.setText(QCoreApplication.translate("Fusion", f"Volume (V/V\u2299): {inputs[4]}", None))
-
+        self.label_13.setPixmap(QPixmap(self.get_image(self.get_star_type(outputs[0][15]))))
+        self.label_14.setText("Example " + self.get_star_type(outputs[0][15]) + " Star")
+    
     def clear_and_reset(self):
         self.inputs = None
         self.outputs = None
@@ -453,8 +492,8 @@ class Ui_Fusion(object):
         self.label_44.setStyleSheet(u"font: 13pt \"Avenir\";")
         self.label_14 = QLabel(self.page_4)
         self.label_14.setObjectName(u"label_14")
-        self.label_14.setGeometry(QRect(290, 350, 111, 16))
-        self.label_14.setStyleSheet(u"color: rgb(252, 255, 76);")
+        self.label_14.setGeometry(QRect(262, 350, 160, 16))
+        self.label_14.setStyleSheet(u"font: 11pt; color: rgb(252, 255, 76);")
         self.label_39 = QLabel(self.page_4)
         self.label_39.setObjectName(u"label_39")
         self.label_39.setGeometry(QRect(30, 300, 191, 16))
@@ -471,7 +510,7 @@ class Ui_Fusion(object):
         self.label_13 = QLabel(self.page_4)
         self.label_13.setObjectName(u"label_13")
         self.label_13.setGeometry(QRect(270, 210, 141, 141))
-        self.label_13.setPixmap(QPixmap(u"images/sun_example.png"))
+        self.label_13.setPixmap(QPixmap("/images/star_examples/brown-dwarf.png"))
         self.label_13.setScaledContents(True)
         self.label_42 = QLabel(self.page_4)
         self.label_42.setObjectName(u"label_42")
@@ -531,7 +570,6 @@ class Ui_Fusion(object):
         self.label_39.raise_()
         self.model_2.raise_()
         self.label_20.raise_()
-        self.label_13.raise_()
         self.label_42.raise_()
         self.label_41.raise_()
         self.label_32.raise_()
@@ -540,6 +578,7 @@ class Ui_Fusion(object):
         self.label_36.raise_()
         self.label_22.raise_()
         self.label_45.raise_()
+        self.label_13.raise_()
 
         self.retranslateUi(Fusion)
 
@@ -586,11 +625,10 @@ class Ui_Fusion(object):
         self.label_18.setText(QCoreApplication.translate("Fusion", u"FUSION: Stellar Parameter Modeling", None))
         self.label_28.setText(QCoreApplication.translate("Fusion", u"Absolute Magnitude (M)(Mv): ", None))
         self.label_44.setText(QCoreApplication.translate("Fusion", u"Star Type: ", None))
-        self.label_14.setText(QCoreApplication.translate("Fusion", u"Generated Image", None))
+        self.label_14.setText(QCoreApplication.translate("Fusion", u"Example Star", None))
         self.label_39.setText(QCoreApplication.translate("Fusion", u"Bolometric Correction: ", None))
         self.model_2.setText(QCoreApplication.translate("Fusion", u"Home", None))
         self.label_20.setText(QCoreApplication.translate("Fusion", u"Diameter (D/D\u2299): ", None))
-        self.label_13.setText("")
         self.label_42.setText(QCoreApplication.translate("Fusion", u"Metallicity (MH/MH\u2299): ", None))
         self.label_41.setText(QCoreApplication.translate("Fusion", u"Gravitational Binding Energy (log(J)): ", None))
         self.label_32.setText(QCoreApplication.translate("Fusion", u"Mass (M/M\u2299): ", None))
@@ -599,5 +637,6 @@ class Ui_Fusion(object):
         self.label_36.setText(QCoreApplication.translate("Fusion", u"Lifespan (SL/SL\u2299): ", None))
         self.label_22.setText(QCoreApplication.translate("Fusion", u"Modeled Star", None))
         self.label_45.setText(QCoreApplication.translate("Fusion", u"Volume (V/V\u2299): ", None))
+        self.label_13.setText("")
     # retranslateUi
 
