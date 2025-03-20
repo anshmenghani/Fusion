@@ -50,6 +50,8 @@ class Ui_Fusion(object):
                 rad = (float(lum)/((float(teff)/5778)**4)) ** (1/2)
         except ValueError:
             self.error = "Enter At Least Two Valid Numbers"
+            self.clear_and_reset()
+            print(self.error)
 
         return float(teff), float(lum), float(rad)
 
@@ -136,7 +138,7 @@ class Ui_Fusion(object):
         self.progressBar.setValue(0)
 
     def import_csv(self):
-        file_path, _ = QFileDialog.getOpenFileName()
+        file_path, _ = QFileDialog.getOpenFileName(None, "Open CSV Stellar Data File", "", "CSV files (*.csv)")
         self.progressBar.setValue(15)
         if os.path.exists(file_path) and str(file_path).endswith(".csv"):
             self.inputs = np.genfromtxt(file_path, delimiter=',', skip_header=1)
@@ -148,9 +150,11 @@ class Ui_Fusion(object):
             self.progressBar.setValue(0)
         else:
             self.error = "Invalid File Path or File Type"
+            self.clear_and_reset()
+            print(self.error)
 
     def export_csv(self):
-        file_path, _ = QFileDialog.getSaveFileName()
+        file_path, _ = QFileDialog.getSaveFileName(None, "Select Save Directory")
         if self.inputs.ndim != 2:
             ins = self.inputs.reshape((1, -1))
             outs = self.outputs.reshape((1, -1))
@@ -175,8 +179,11 @@ class Ui_Fusion(object):
         header_vals = ",EffectiveTemperature(Teff)(K),Luminosity(L/Lo),Radius(R/Ro),Diameter(D/Do),Volume(V/Vo),SurfaceArea(SA/SAo),GreatCircleCircumference(GCC/GCCo),GreatCircleArea(GCA/GCAo),AbsoluteBolometricMagnitude(Mbol),AbsoluteMagnitude(M)(Mv),BolometricCorrection(BC)(mag),AbsoluteBolometricLuminosity(Lbol)(log(W)),Mass(M/Mo),AverageDensity(D/Do),CentralPressure(log(N/m^2)),CentralTemperature(log(K)),Lifespan(SL/SLo),SurfaceGravity(log(g)...log(N/kg)),GravitationalBindingEnergy(log(J)),BolometricFlux(log(W/m^2)),Metallicity(log(MH/MHo)),SpectralClass,LuminosityClass,StarPeakWavelength(nm),StarType,StellarClassification"
         if os.path.exists(os.path.dirname(file_path)):
             np.savetxt(str(file_path) + ".csv", combined, delimiter=',', header=header_vals, comments='', fmt='%s')
+            self.clear_and_reset()
         else:
             self.error = "Invalid Specified Path"
+            self.clear_and_reset()
+            print(self.error)
 
     def open_instructions(self):
         webbrowser.open_new_tab("https://github.com/anshmenghani/Fusion")
@@ -196,6 +203,8 @@ class Ui_Fusion(object):
         elif st == "Hypergiant":
             return "/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/star_examples/hypergiant.png"
 
+    def open_info(self):
+        self.stackedWidget.setCurrentIndex(2)
 
     def update_output_text(self):
         inputs = [round(i, 3) for i in self.inputs]
@@ -325,7 +334,7 @@ class Ui_Fusion(object):
         self.label_8 = QLabel(self.page_3)
         self.label_8.setObjectName(u"label_8")
         self.label_8.setGeometry(QRect(298, 87, 15, 15))
-        self.label_8.setPixmap(QPixmap(u"images/icons/settings.svg"))
+        self.label_8.setPixmap(QPixmap(u"images/icons/question.svg"))
         self.label_8.setScaledContents(True)
         self.label_9 = QLabel(self.page_3)
         self.label_9.setObjectName(u"label_9")
@@ -546,6 +555,56 @@ class Ui_Fusion(object):
         self.label_45.setGeometry(QRect(30, 180, 191, 16))
         self.label_45.setStyleSheet(u"font: 13pt \"Avenir\";")
         self.stackedWidget.addWidget(self.page_4)
+
+        self.page_5 = QWidget()
+        self.page_5.setObjectName(u"page_5")
+        self.page_5.setGeometry(QRect(200, 40, 241, 191))
+        self.page_5.setStyleSheet(u"background-color: rgb(57, 57, 57);")
+        self.pushButton_5 = QPushButton(self.page_5)
+        self.pushButton_5.setObjectName(u"pushButton_5")
+        self.pushButton_5.setStyleSheet(u'color: rgb(221, 251, 210); background-color: "black"; border: 10pt solid "blue"\n')
+        self.pushButton_5.setGeometry(QRect(10, 197, 100, 32))
+        self.pushButton_5.clicked.connect(self.clear_and_reset)
+
+        self.label_77 = QLabel(self.page_5)
+        self.label_77.setObjectName(u"label_77")
+        self.label_77.setGeometry(QRect(10, 10, 231, 20))
+        self.label_77.setStyleSheet(u"font: 24pt, Bodoni 72;\n"
+"color: rgb(188, 247, 236)")
+        self.label_76 = QLabel(self.page_5)
+        self.label_76.setObjectName(u"label_76")
+        self.label_76.setGeometry(QRect(10, 40, 221, 16))
+        self.label_75 = QLabel(self.page_5)
+        self.label_75.setObjectName(u"label_75")
+        self.label_75.setGeometry(QRect(10, 160, 221, 16))
+        self.label_74 = QLabel(self.page_5)
+        self.label_74.setObjectName(u"label_74")
+        self.label_74.setGeometry(QRect(10, 60, 221, 16))
+        self.label_73 = QLabel(self.page_5)
+        self.label_73.setObjectName(u"label_73")
+        self.label_73.setGeometry(QRect(10, 80, 221, 16))
+        self.label_72 = QLabel(self.page_5)
+        self.label_72.setObjectName(u"label_72")
+        self.label_72.setGeometry(QRect(10, 100, 221, 16))
+        self.label_71 = QLabel(self.page_5)
+        self.label_71.setObjectName(u"label_71")
+        self.label_71.setGeometry(QRect(10, 140, 221, 16))
+        self.label_71.setStyleSheet(u"color: rgb(86, 117, 255);\n"
+"")
+        self.label_70 = QLabel(self.page_5)
+        self.label_70.setObjectName(u"label_70")
+        self.label_70.setGeometry(QRect(10, 174, 191, 16))
+        self.label_70.setStyleSheet(u"font: 10pt\n"
+"")
+        self.label_78 = QLabel(self.page_5)
+        self.label_78.setObjectName(u"label_78")
+        self.label_78.setGeometry(QRect(10, 120, 221, 16))
+        self.label101 = QLabel()
+        self.label101.setObjectName(u"label101")
+        self.label101.setGeometry(QRect(190, 30, 261, 211))
+        self.label101.setStyleSheet(u"background-color: rgb(207, 207, 207);")
+        self.stackedWidget.addWidget(self.page_5)
+
         self.frame_2.raise_()
         self.label_25.raise_()
         self.label_26.raise_()
@@ -579,6 +638,9 @@ class Ui_Fusion(object):
         self.label_22.raise_()
         self.label_45.raise_()
         self.label_13.raise_()
+        self.label101.raise_()
+        self.page_5.raise_()
+        self.pushButton_5.raise_()
 
         self.retranslateUi(Fusion)
 
@@ -597,8 +659,10 @@ class Ui_Fusion(object):
         self.label.setText(QCoreApplication.translate("Fusion", u"FUSION: Stellar Parameter Modeling", None))
         self.label_10.setText(QCoreApplication.translate("Fusion", u"Simulation Name:", None))
         self.pushButton_2.setText("")
+        self.pushButton_5.setText("Home")
         self.model.setText(QCoreApplication.translate("Fusion", u"Model Star(s)", None))
         self.pushButton_4.setText("")
+        self.pushButton_4.clicked.connect(self.open_info)
         self.label_8.setText("")
         self.label_9.setText("")
         self.label_2.setText(QCoreApplication.translate("Fusion", u"Enter Star's Input Parameters:", None))
@@ -638,5 +702,15 @@ class Ui_Fusion(object):
         self.label_22.setText(QCoreApplication.translate("Fusion", u"Modeled Star", None))
         self.label_45.setText(QCoreApplication.translate("Fusion", u"Volume (V/V\u2299): ", None))
         self.label_13.setText("")
+        self.label_77.setText(QCoreApplication.translate("Widget", u"FUSION Information", None))
+        self.label_76.setText(QCoreApplication.translate("Widget", u"Version: v1.4.2 (20/03/2025)", None))
+        self.label_75.setText(QCoreApplication.translate("Widget", u"\u00a9 2025 Ansh Menghani", None))
+        self.label_74.setText(QCoreApplication.translate("Widget", u"Supported input type: float numbers", None))
+        self.label_73.setText(QCoreApplication.translate("Widget", u"Supported import file type: .csv ", None))
+        self.label_72.setText(QCoreApplication.translate("Widget", u"Supported export file type: .csv ", None))
+        self.label_71.setText(QCoreApplication.translate("Widget", u"<a href='https://github.com/anshmenghani/Fusion/'>Need Help? Support here</a>", None))
+        self.label_70.setText(QCoreApplication.translate("Widget", u"ansh.menghani@gmail.com", None))
+        self.label_78.setText(QCoreApplication.translate("Widget", u"Star image credits: Tanya C. Forde", None))
+        self.label101.setText("")
     # retranslateUi
 
