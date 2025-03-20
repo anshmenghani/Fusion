@@ -51,7 +51,14 @@ curr_val_loss = Variable(1, dtype=float32)
 
 
 def data_prep(df, inputs, outputs, mod_attrs, func_attrs, funcs):
-   """Prepare training and testing data from dataframe"""
+   """
+   This function prepares the Gaia DR3 data to be used for training. More specifically, it splits the 
+   data into training (and validation) and testing data. It then normalizes the data using scikit-learns 
+   RobustScaler, which uses the median and interquartile range to normalize the data. This ensures 
+   outliers in data do not skew the dataset too much. Next, the function applies any 
+   modifications/preprocessing to the data as necessary. Finally, it returns the finished training and 
+   testing data. 
+   """
    df = shuffle(df)   
    x = df[inputs].iloc[:, :]
    y = df[outputs].iloc[:, :]
@@ -77,7 +84,10 @@ def data_prep(df, inputs, outputs, mod_attrs, func_attrs, funcs):
 
 
 class UpdateHistory(callbacks.Callback):
-    """Updates the validation loss records in the model's callback history"""
+    """
+    This class defines the methods used to track validation losses across epochs so that the program 
+    can reward the model for decreases in validation loss during training. 
+    """
     def __init__(self):
         super(UpdateHistory, self).__init__()
 
@@ -93,7 +103,11 @@ class UpdateHistory(callbacks.Callback):
 
 @register_keras_serializable()
 class LambdaLayerClass(Layer):
-    """Allow the compatibility of lambda layers with saving the model"""
+    """
+    This class defines the operations that are used to inform the model of the physical laws that are 
+    used to govern a stellar system so that it does not violate them when training and making 
+    predictions. 
+    """
     def __init__(self, func, name, **kwargs):
         super(LambdaLayerClass, self).__init__(**kwargs)
         self.name = name
@@ -145,7 +159,11 @@ class LambdaLayerClass(Layer):
 
 
 def lambda_init(in_layer, indices, no_right=False):
-   """Slice layers for desired inputs"""
+   """
+   This function formats the lambda layers (responsible for informing the model of the physical 
+   formulas that govern stellar systems) to be compatible with the structure of the model defined in 
+   the `createSubModel`, `createModels`, and `fuseModels` functions.
+   """
    in_shape = in_layer.shape[1]
    inter1 = Reshape((in_shape, 1))(in_layer)
    
@@ -167,14 +185,24 @@ def lambda_init(in_layer, indices, no_right=False):
 
 
 class ValLossRewardConstraint(Constraint):
-    """Constrains the validation loss reward ratio weight to a reasonable size"""
+    """
+    The model is rewarded every time its validation loss decreases. This constraint sets limits on how 
+    much the model can be rewarded based on how much the validation loss of the model changes 
+    between training steps. This prevents the model’s loss from going out of control in the early 
+    stages of training where changes in validation loss are more random, as the model has not looked 
+    at enough data to see patterns in it. A side effect of this validation loss reward is that when the 
+    validation loss increases, the model penalizes itself by adding to its loss.
+    """    
     def __call__(self, weights):
         return clip_by_value(weights, 0.001, 3)
 
 
 @register_keras_serializable()
 class LossRewardOptimizer(Layer):
-    """Trains a weight to reward the model for improvments in validation loss"""
+    '''
+    This class defines the method used to train the variable that determines how much the model 
+    should be rewarded based on how much validation loss improved between two steps.
+    '''
     def __init__(self, name, **kwargs):
         super(LossRewardOptimizer, self).__init__(**kwargs)
         self.name = name
@@ -207,14 +235,23 @@ class LossRewardOptimizer(Layer):
 
 
 def RMSLE(y_true, y_pred):
-   """Square Root Mean Squared Logarithmic Error"""
+   """
+   This function defines the Square-Root Mean Squared Logarithmic Error loss function (among 
+   other loss functions used such as Mean Squared Logarithmic Error and Categorical 
+   Crossentropy, this one is not built in). It calculates the logarithmic difference between a predicted 
+   value and the “true” value, squares that, finds the mean of each one of those values for all testing 
+   data, and then takes the square root of the resultant value.
+   """
    mean_squared_logarithmic_error = MSLE()
    return K.sqrt(mean_squared_logarithmic_error(y_true, y_pred))
 
 
 @register_keras_serializable()
 class DLR(Loss):
-    """Custom loss to factor in validation loss reward"""
+    """
+    This class contains the methods used to implement the validation loss reward by subtracting it 
+    from the models loss.
+    """
     def __init__(self, init_loss_func, model, count, **kwargs):
         super(DLR, self).__init__(**kwargs)
         self.init_loss_func = init_loss_func
@@ -248,7 +285,11 @@ class DLR(Loss):
 
 
 def lambda_functors():
-   """Define the lambda layers of the model"""
+   """
+   This function initializes all of the specific physical formulas that govern stellar systems to be 
+   added to the model by creating separate instances of the LamdaLayerClass class for each 
+   formula involved.
+   """
    mbol_lam = LambdaLayerClass(name="llcLayer0", func="mbol")
    lbol_lam = LambdaLayerClass(name="llcLayer1", func="lbol") 
    mass_lam = LambdaLayerClass(name="llcLayer2", func="mass")
@@ -264,7 +305,11 @@ def lambda_functors():
 
 
 def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True, bound=None, embed=False, embed_dim=None, output_actv=None, output_neurons=1):
-   """Create each output's individual submodel"""
+   """
+   This function creates submodels for each parameter the final model predicts. Each submodel is 
+   different as they have different tasks (some perform regression and others are classifiers), inputs, 
+   formulas associated with them, and output types.
+   """
    global gen_inputs
    global submodelCount
 
@@ -329,7 +374,10 @@ def createSubModel(shape=None, lambda_layer=None, lambda_inputs=None, norm=True,
 
 
 def createModels():
-   """Consolidate all submodels with submodel-specific parameters"""
+   """
+   This function calls the `createSubModel` function for each specific parameter the model 
+   predicts and returns these separate submodels.
+   """
    mbol_lam, lbol_lam, mass_lam, density_lam, central_pressure_lam, central_temp_lam, lifespan_lam, grav_bind_lam, flux_lam, peak_wavelength_lam = lambda_functors()
 
    mbol_submodel = createSubModel(shape=8, lambda_layer=mbol_lam, lambda_inputs=[1])
@@ -353,7 +401,10 @@ def createModels():
 
 
 def fuseModels(models, name):
-   """Compile the final model"""
+   """
+   This function combines (compiles) all of the submodels created from the `createModels`
+   function into one model for training.
+   """
    fusion_inputs = models[0][0]
    fusion_outputs = [y[1] for y in models]
    fusion = Model(inputs=fusion_inputs, outputs=fusion_outputs, name=name)
@@ -363,7 +414,11 @@ def fuseModels(models, name):
 
 
 def Fuse():
-   """Train the model and return the trained model and testing data"""
+   """
+   This function is responsible for properly training the model using a multitude of methods (such 
+   as EarlyStopping, which is responsible for stopping training when validation loss is no longer 
+   improving and restoring the models best weights) and many fine-tuned hyperparameters.
+   """
    dataset = pd.read_csv("src/FUSION/FusionStellaarData.csv")
    x_cols = ["EffectiveTemperature(Teff)(K)", "Luminosity(L/Lo)", "Radius(R/Ro)", "Diameter(D/Do)", "Volume(V/Vo)", "SurfaceArea(SA/SAo)", "GreatCircleCircumference(GCC/GCCo)", "GreatCircleArea(GCA/GCAo)"]
    y_cols = ["AbsoluteBolometricMagnitude(Mbol)", "AbsoluteMagnitude(M)(Mv)", "AbsoluteBolometricLuminosity(Lbol)(log(W))", "Mass(M/Mo)", "AverageDensity(D/Do)", "CentralPressure(log(N/m^2))", "CentralTemperature(log(K))", "Lifespan(SL/SLo)", "SurfaceGravity(log(g)...log(N/kg))", "GravitationalBindingEnergy(log(J))", "BolometricFlux(log(W/m^2))", "Metallicity(log(MH/MHo))", "SpectralClass", "LuminosityClass", "StarPeakWavelength(nm)", "StarType"]
