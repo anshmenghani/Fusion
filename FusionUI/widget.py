@@ -1,4 +1,5 @@
 # This Python file uses the following encoding: utf-8
+# Run this file to launch the User Interface
 import sys
 sys.path.append('src/FUSION')
 
