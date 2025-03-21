@@ -65,7 +65,7 @@ and click the `Model Star(s)` button.
 
 You can export the simulation data as a Comma-Seperated Values file (`.csv`) by clicking the `Export` button.
 
-Furthermore, you can import `csv` files containing input data for multiple starts by clicking the middle import button on the top of the front page. The prediction data for each of these stars can also be exported as a `csv` file after clickign the button. On the left of this button links to this GitHub repository for help, and the button to the right of that middle button gives application information. 
+Furthermore, you can import `csv` files containing input data for multiple starts by clicking the middle import button on the top of the front page. The prediction data for each of these stars can also be exported as a `csv` file after clicking the button. On the left of this button links to this GitHub repository for help, and the button to the right of that middle button gives application information. 
 
 ### Clone the repository
 Make sure `Python` is installed.
