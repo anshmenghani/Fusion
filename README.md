@@ -56,7 +56,17 @@ The model uses a TensorFlow/Keras backend with custom functions tailored to the 
 ## Usage
 #### Please take a look at the license found in this directory under the filename `LICENSE` 
 ### Install the application
-#### Once the project materials are finished, I will start working on deployment and usage instructions for the general public 
+#### The User Interface of the project is complete. Once it is packaged, I will upload the application files for download here. The User Interface can currently be used by cloning the repository and running `Fusion/FusionUI/widget.py` as shown below. To model a single star, simply input at least two of the following three input parameters of the star:
+- Effective Temperature (Kelvin)
+- Luminosity (Solar Luminosities)
+- Radius (Solar Radii)
+  
+and click the `Model Star(s)` button.
+
+You can export the simulation data as a Comma-Seperated Values file (`.csv`) by clicking the `Export` button.
+
+Furthermore, you can import `csv` files containing input data for multiple starts by clicking the middle import button on the top of the front page. The prediction data for each of these stars can also be exported as a `csv` file after clickign the button. On the left of this button links to this github repository for help, and the button to the right of that middle button gives application information. 
+
 ### Clone the repository
 Make sure `Python` is installed.
 
