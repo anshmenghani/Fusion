@@ -80,6 +80,6 @@ Assuming `Python` is already installed, run (from the resultant `Fusion` directo
 
 `pip install -r requirements.txt`
 
-`Fusion` is now set up in your directory. Each file has a description in the comments. Run `Fusion/FusionUI/widget.py` to launch the User Interface from the repository.
+`Fusion` is now set up in your directory. Each file has a description in the comments. Run `Fusion/FusionUI/widget.py` to launch the User Interface from the directory.
 ### Contact Information for Inquiries: 
 `ansh.menghani@gmail.com`
