@@ -59,11 +59,17 @@ The model uses a TensorFlow/Keras backend with custom functions tailored to the 
 #### Once the project materials are finished, I will start working on deployment and usage instructions for the general public 
 ### Clone the repository
 Make sure `Python` is installed.
+
 With `git`, run:
+
 `git clone https://github.com/anshmenghani/Fusion.git`
+
 Be sure to create a virtual enviornment and activate it.
+
 Assuming `Python` is already installed, run
+
 `pip install -r requirements.txt`
+
 `Fusion` is now set up in your directory. Each file has a description in the comments. Run `Fusion/FusionUI/widget.py` to launch the User Interface from the repository.
 ### Contact Information for Inquiries: 
 `ansh.menghani@gmail.com`
