@@ -64,9 +64,9 @@ With `git`, run:
 
 `git clone https://github.com/anshmenghani/Fusion.git`
 
-Be sure to create a virtual enviornment and activate it.
+Be sure to create a virtual enviornment in the resultant `Fusion` directory and activate it.
 
-Assuming `Python` is already installed, run
+Assuming `Python` is already installed, run (from the resultant `Fusion` directory)
 
 `pip install -r requirements.txt`
 
