@@ -72,14 +72,14 @@ Make sure `Python` is installed.
 
 With `git`, run:
 
-`git clone https://github.com/anshmenghani/Fusion.git`
+```git clone https://github.com/anshmenghani/Fusion.git```
 
 Be sure to create a virtual enviornment in the resultant `Fusion` directory and activate it.
 
 Assuming `Python` is already installed, run (from the resultant `Fusion` directory)
 
-`pip install -r requirements.txt`
+```pip install -r requirements.txt```
 
 `Fusion` is now set up in your directory. Each file has a description in the comments. Run `Fusion/FusionUI/widget.py` to launch the User Interface from the directory.
 ### Contact Information for Inquiries: 
-`ansh.menghani@gmail.com`
+```ansh.menghani@gmail.com```
