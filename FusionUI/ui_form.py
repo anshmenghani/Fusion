@@ -182,7 +182,6 @@ class Ui_Fusion(object):
             self.clear_and_reset()
         else:
             self.error = "Invalid Specified Path"
-            self.clear_and_reset()
             print(self.error)
 
     def open_instructions(self):
@@ -284,7 +283,7 @@ class Ui_Fusion(object):
             Fusion.setObjectName(u"Fusion")
         Fusion.resize(450, 625)
         Fusion.setAutoFillBackground(False)
-        Fusion.setWindowIcon(QIcon('images/FusionIcon.svg'))
+        Fusion.setWindowIcon(QIcon('/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/FusionIconSVG.svg'))
         self.stackedWidget = QStackedWidget(Fusion)
         self.stackedWidget.setObjectName(u"stackedWidget")
         self.stackedWidget.setGeometry(QRect(0, 0, 461, 651))
@@ -334,12 +333,12 @@ class Ui_Fusion(object):
         self.label_8 = QLabel(self.page_3)
         self.label_8.setObjectName(u"label_8")
         self.label_8.setGeometry(QRect(298, 87, 15, 15))
-        self.label_8.setPixmap(QPixmap(u"images/icons/question.svg"))
+        self.label_8.setPixmap(QPixmap(u"/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/icons/question.svg"))
         self.label_8.setScaledContents(True)
         self.label_9 = QLabel(self.page_3)
         self.label_9.setObjectName(u"label_9")
         self.label_9.setGeometry(QRect(218, 87, 15, 15))
-        self.label_9.setPixmap(QPixmap(u"images/icons/upload.svg"))
+        self.label_9.setPixmap(QPixmap(u"/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/icons/upload.svg"))
         self.label_9.setScaledContents(True)
         self.label_5 = QLabel(self.page_3)
         self.label_5.setObjectName(u"label_5")
@@ -366,7 +365,7 @@ class Ui_Fusion(object):
         self.label_6 = QLabel(self.frame)
         self.label_6.setObjectName(u"label_6")
         self.label_6.setGeometry(QRect(10, 10, 371, 311))
-        self.label_6.setPixmap(QPixmap(u"images/stars.png"))
+        self.label_6.setPixmap(QPixmap(u"/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/stars.png"))
         self.label_6.setScaledContents(True)
 
         self.progressBar = QProgressBar(self.page_3)
@@ -376,7 +375,7 @@ class Ui_Fusion(object):
         self.label_7 = QLabel(self.page_3)
         self.label_7.setObjectName(u"label_7")
         self.label_7.setGeometry(QRect(138, 87, 15, 15))
-        self.label_7.setPixmap(QPixmap(u"images/icons/info.svg"))
+        self.label_7.setPixmap(QPixmap(u"/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/icons/info.svg"))
         self.label_7.setScaledContents(True)
         self.lineEdit_4 = QLineEdit(self.page_3)
         self.lineEdit_4.setObjectName(u"lineEdit_4")
@@ -444,12 +443,12 @@ class Ui_Fusion(object):
         self.label_21 = QLabel(self.frame_2)
         self.label_21.setObjectName(u"label_21")
         self.label_21.setGeometry(QRect(10, 10, 421, 311))
-        self.label_21.setPixmap(QPixmap(u"images/stars.png"))
+        self.label_21.setPixmap(QPixmap(u"/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/stars.png"))
         self.label_21.setScaledContents(True)
         self.label_29 = QLabel(self.frame_2)
         self.label_29.setObjectName(u"label_29")
         self.label_29.setGeometry(QRect(10, 190, 421, 351))
-        self.label_29.setPixmap(QPixmap(u"images/stars.png"))
+        self.label_29.setPixmap(QPixmap(u"/Users/anshmenghani/Documents/GitHub/Fusion/FusionUI/images/stars.png"))
         self.label_29.setScaledContents(True)
         self.label_29.raise_()
         self.label_21.raise_()
@@ -713,4 +712,3 @@ class Ui_Fusion(object):
         self.label_78.setText(QCoreApplication.translate("Widget", u"Star image credits: Tanya C. Forde", None))
         self.label101.setText("")
     # retranslateUi
-
