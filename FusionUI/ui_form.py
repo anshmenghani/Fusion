@@ -712,3 +712,4 @@ class Ui_Fusion(object):
         self.label_78.setText(QCoreApplication.translate("Widget", u"Star image credits: Tanya C. Forde", None))
         self.label101.setText("")
     # retranslateUi
+ 
