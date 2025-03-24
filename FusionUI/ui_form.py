@@ -407,7 +407,7 @@ class Ui_Fusion(object):
         self.label_25 = QLabel(self.page_4)
         self.label_25.setObjectName(u"label_25")
         self.label_25.setGeometry(QRect(30, 240, 221, 16))
-        self.label_25.setStyleSheet(u"font: 13pt \"Avenir\";")
+        self.label_25.setStyleSheet(u"font: 11pt \"Avenir\";")
         self.label_26 = QLabel(self.page_4)
         self.label_26.setObjectName(u"label_26")
         self.label_26.setGeometry(QRect(30, 320, 231, 16))
