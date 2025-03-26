@@ -49,7 +49,7 @@ The target stars:
 - Star Type (classification) (class Brown Dwarf, Red Dwarf, White Dwarf, Main Sequence, Supergiant, or Hypergiant)
 #### Outputs calculated outside the model but based on model predictions 
 - Bolometric Correction (based on the predicted bolometric and absolute magnitude values) 
-- Stellar Classification (based on the predicted Spectral and Luminosity classes. For example, the Sun is a G2V star—the '2' is a subclass (from 0–9, where 0 is the hottest sublass and 9 is the coolest) of the 'G' spectral class, and the 'V' is the star's luminosity class)
+- Stellar Classification (based on the predicted Spectral and Luminosity classes. For example, the Sun is a G2V star—the '2' is a subclass (from 0–9, where 0 is the hottest subclass and 9 is the coolest) of the 'G' spectral class, and the 'V' is the star's luminosity class)
 
 The model uses a TensorFlow/Keras backend with custom functions tailored to the specific regression and classification problems described above as well as overall model improvement. 
 
@@ -63,7 +63,7 @@ The model uses a TensorFlow/Keras backend with custom functions tailored to the 
   
 and click the `Model Star(s)` button.
 
-You can export the simulation data as a Comma-Seperated Values file (`.csv`) by clicking the `Export` button.
+You can export the simulation data as a Comma-Separated Values file (`.csv`) by clicking the `Export` button.
 
 Furthermore, you can import `csv` files containing input data for multiple starts by clicking the middle import button on the top of the front page. The prediction data for each of these stars can also be exported as a `csv` file after clicking the button. On the left of this button links to this GitHub repository for help, and the button to the right of that middle button gives application information. 
 
@@ -76,7 +76,7 @@ With `git`, run:
 git clone https://github.com/anshmenghani/Fusion.git
 ```
 
-Be sure to create a virtual enviornment in the resultant `Fusion` directory and activate it.
+Be sure to create a virtual environment in the resultant `Fusion` directory and activate it.
 
 Assuming `Python` is already installed, run (from the resultant `Fusion` directory)
 
@@ -85,5 +85,10 @@ pip install -r requirements.txt
 ```
 
 `Fusion` is now set up in your directory. Each file has a description in the comments. Run `Fusion/FusionUI/widget.py` to launch the User Interface from the directory.
+
+**IMPORTANT: ** Due to configuration, some of the path references in `ui_form.py` (in the `FusionUI` directory) contain ABSOLUTE paths. You will need to change these to either:
+- The absolute path of that file on your machine OR
+- The relative path of that file on your machine
+  
 ### Contact Information for Inquiries: 
 ```ansh.menghani@gmail.com```
