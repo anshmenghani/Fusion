@@ -66,19 +66,19 @@ class Ui_Fusion(object):
     def get_spec_class(self, c, t):
         c = int(c)
         if c == 0:
-            return "M" + str(self.min_max(int(np.floor((t - 4000) / 160))))
+            return "M" + str(self.min_max(int(np.floor((t - 3500) / 160))))
         elif c == 1:
-            return "K" + str(self.min_max(int(np.floor((t - 5200) / 120))))
+            return "K" + str(self.min_max(int(np.floor((t - 4000) / 120))))
         elif c == 2:
-            return "G" + str(self.min_max(int(np.floor((t - 7000) / 200))))
+            return "G" + str(self.min_max(int(np.floor((t - 5200) / 200))))
         elif c == 3:
-            return "F" + str(self.min_max(int(np.floor((t - 12000) / 500))))
+            return "F" + str(self.min_max(int(np.floor((t - 7000) / 500))))
         elif c == 4:
-            return "A" + str(self.min_max(int(np.floor((t - 20000) / 800))))
+            return "A" + str(self.min_max(int(np.floor((t - 12000) / 800))))
         elif c == 5:
-            return "B" + str(self.min_max(int(np.floor((t - 34000) / 1400))))
+            return "B" + str(self.min_max(int(np.floor((t - 20000) / 1400))))
         elif c == 6:
-            return "O" + str(self.min_max(int(np.floor((t - 100000) / 7600))))
+            return "O" + str(self.min_max(int(np.floor((t - 34000) / 7600))))
         
     def get_lum_class(self, l):
         l = int(l)
